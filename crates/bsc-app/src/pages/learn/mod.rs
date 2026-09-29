@@ -5,6 +5,7 @@ mod ch1;
 mod ch2;
 mod ch3;
 mod ch4;
+mod ch5;
 
 use eframe::egui::{self, RichText, ScrollArea, Ui};
 
@@ -95,11 +96,11 @@ pub const COURSE: &[Chapter] = &[
     Chapter {
         title: "第 5 章 · 优化：让程序更快更小",
         lessons: &[
-            planned("5.1", "常量折叠与代数化简", Level::Basic, "编译期能算出来的就不留到运行时。"),
-            planned("5.2", "数据流分析", Level::Basic, "活跃变量、到达定值；worklist 算法单步演示。"),
-            planned("5.3", "死代码消除", Level::Basic, "没人用的计算可以删掉——但要小心副作用。"),
-            planned("5.4", "格与不动点", Level::Advanced, "数据流分析的数学基础：半格、单调函数、不动点定理。"),
-            planned("5.5", "稀疏条件常量传播", Level::Advanced, "SCCP 算法在 SSA 上的逐步演示。"),
+            ready("5.1", "常量折叠与代数化简", Level::Basic),
+            ready("5.2", "数据流分析", Level::Basic),
+            ready("5.3", "死代码消除", Level::Basic),
+            ready("5.4", "格与不动点", Level::Advanced),
+            ready("5.5", "稀疏条件常量传播", Level::Advanced),
         ],
     },
     Chapter {
@@ -124,6 +125,7 @@ pub struct LearnPage {
     ch2: ch2::Chapter,
     ch3: ch3::Chapter,
     ch4: ch4::Chapter,
+    ch5: ch5::Chapter,
 }
 
 impl Default for LearnPage {
@@ -135,6 +137,7 @@ impl Default for LearnPage {
             ch2: ch2::Chapter::default(),
             ch3: ch3::Chapter::default(),
             ch4: ch4::Chapter::default(),
+            ch5: ch5::Chapter::default(),
         }
     }
 }
@@ -207,6 +210,11 @@ impl LearnPage {
             "4.2" => self.ch4.cfg.ui(ui),
             "4.3" => self.ch4.dom.ui(ui),
             "4.4" => self.ch4.ssa.ui(ui),
+            "5.1" => self.ch5.fold.ui(ui),
+            "5.2" => self.ch5.dataflow.ui(ui),
+            "5.3" => self.ch5.dce.ui(ui),
+            "5.4" => self.ch5.lattice.ui(ui),
+            "5.5" => self.ch5.sccp.ui(ui),
             _ => planned_lesson(ui, meta),
         }
     }

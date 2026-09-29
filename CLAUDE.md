@@ -24,7 +24,8 @@ crates/
   bsc-automata 正则 → NFA（Thompson）→ DFA（子集构造）→ 最小化（Moore 划分细化）→ 多规则词法分析器生成（最长匹配 + 优先级），全部带逐步记录；第 1 章用
   bsc-grammar  上下文无关文法工具：文法文本解析、Earley（任意 CFG，给出全部语法树）、最左推导、随机造句、FIRST/FOLLOW、LL(1)、LR(0)/SLR；第 2 章用。Earley 以后也给黑话编译器用
   bsc-minilang 教学语言 mini-lang：手写词法分析器（1.1 课）+ 语法分析器（语句递归下降、表达式 Pratt、恐慌模式与插入式错误恢复；2.3/2.4 课）+ 语义分析 sema.rs（作用域链、符号表、名字解析、类型检查，Error 类型防连锁报错；3.1/3.2 课）
-               + ir（三地址码）→ cfg（基本块、控制流图）→ dom（支配树、支配边界）→ ssa（半剪枝 SSA）；interp 直接执行控制流图，用来对照测试（第 4 章）。AST 是统一的节点数组（NodeKind + children）
+               + ir（三地址码）→ cfg（基本块、控制流图）→ dom（支配树、支配边界）→ ssa（半剪枝 SSA）；interp 直接执行控制流图，用来对照测试（第 4 章）
+               + dataflow（通用 gen/kill 工作表求解：活跃变量、到达定值）→ opt（局部常量/复制传播、折叠、代数化简、分支折叠、DCE）→ sccp（第 5 章）。AST 是统一的节点数组（NodeKind + children）
   bsc-types    迷你 ML（不写类型的函数式小语言）+ Hindley–Milner 类型推导（合一、occurs check、实例化、let 泛化，全程事件记录）；3.3 课用
   bsc-app    eframe/egui 图形界面，原生与 wasm 共用一份代码
     src/app.rs          顶栏 + 三个页面（学习 / 实验台 / 黑话编译器），状态持久化
@@ -37,6 +38,7 @@ crates/
     src/pages/learn/ch2/ 第 2 章各课（grammar/ambiguity/rd/pratt/ll1/lr；replay.rs 回放 mini-lang 分析事件）
     src/pages/learn/ch3/ 第 3 章各课（scope/typeck/infer；mod.rs 里的 Front 跑一遍 mini-lang 前端）
     src/pages/learn/ch4/ 第 4 章各课（tac/cfg/dom/ssa；mod.rs 里的 IrFront、控制流图画法、基本块卡片）
+    src/pages/learn/ch5/ 第 5 章各课（fold/dataflow/dce/lattice/sccp；mod.rs 里的例子程序和 run_check：用解释器对照优化前后）
     src/grammar_view.rs 第 2 章共用：文法编辑器、句子切分、产生式列表
     src/widgets/        通用组件：Stepper 播放器、源码高亮、树布局、状态图（graph_view：分层布局、自环、回边弧线）、
                         栈、测验、诊断展示、chip 小卡片、prose（反引号 → 行内代码）
@@ -58,6 +60,9 @@ crates/
   - 嵌套的纵向 `ScrollArea` 高度不可靠，课程页里别用。
   - 说明文字里用了反引号或 `**强调**` 的，必须用 `widgets::prose`（`ui.label` 会原样显示反引号）。
 - 代码字体 JetBrains Mono 子集**去掉了连字**（否则 `<=` 显示成 `≤`）。
+- 子集范围内的码位**不一定真有字形**（思源黑体只有 GB2312 里的数学符号，比如有 ⊥ 没有 ⊤）。新用了特殊符号，用下面的命令检查源码里有没有字体缺的字符（没有输出才对）：
+  `python3 -c "from fontTools.ttLib import TTFont;import glob;m=TTFont('crates/bsc-app/assets/fonts/NotoSansSC-Subset.ttf').getBestCmap();print({c for f in glob.glob('crates/*/src/**/*.rs',recursive=True) for c in open(f).read() if ord(c)>127 and ord(c) not in m})"`
+  缺的符号可以像 `assets/fonts/add_glyphs.py` 那样从现有字形派生。
 - Rust edition 2024，MSRV 1.95；`rustfmt.toml` 行宽 120。
 
 ## 常用命令
@@ -98,7 +103,7 @@ CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查；`p
 - [x] M2 第 2 章语法：2.1 文法与推导、2.2 歧义与优先级、2.3 递归下降、2.4 Pratt、2.5 LL(1)、2.6 LR；mini-lang 语法分析器
 - [x] M3 第 3 章语义：3.1 作用域与符号表、3.2 类型检查、3.3 类型推导（HM）
 - [x] M4 第 4 章中间表示：4.1 三地址码、4.2 基本块与控制流图、4.3 支配树、4.4 SSA
-- [ ] M5 第 5 章优化：数据流框架（活跃变量、到达定值）、常量折叠/传播、死代码消除、格与不动点、SCCP
+- [x] M5 第 5 章优化：5.1 常量折叠与代数化简、5.2 数据流分析、5.3 死代码消除、5.4 格与不动点、5.5 SCCP
 - [ ] M6 起：黑话编译器 v1；第 6 章后端（字节码 VM、RISC-V 汇编 + 内置模拟器、寄存器分配）
 
 ## 协作约定

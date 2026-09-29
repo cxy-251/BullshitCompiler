@@ -12,6 +12,9 @@ pyftsubset NotoSansSC-Regular.ttf --text-file=chars.txt --layout-features='*' --
 pyftsubset JetBrainsMono-Regular.ttf --unicodes='U+0020-007E,U+00A0-017F,U+0370-03FF,U+2000-206F,U+2190-22FF,U+2500-25FF' --layout-features='kern' --no-hinting --output-file=JetBrainsMono-Subset.ttf
 ```
 
+裁剪后再运行 `python3 add_glyphs.py NotoSansSC-Subset.ttf`：思源黑体没有 ⊤（U+22A4）和 ⊢（U+22A2），
+脚本用 ⊥ 的轮廓上下翻转、旋转 90° 派生出这两个字形（格与类型规则的课要用）。
+
 `chars.txt` = GB2312 全部字符 ∪ U+0020–007E ∪ U+00A0–017F ∪ U+0370–03FF ∪ U+2000–206F ∪ U+2190–22FF ∪ U+2500–25FF ∪ U+3000–303F ∪ U+FF00–FFEF。
 
 版权声明：Noto Sans SC © 2014-2021 Adobe (http://www.adobe.com/), with Reserved Font Name 'Source'；

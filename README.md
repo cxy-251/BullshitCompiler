@@ -15,6 +15,7 @@
 | 第 2 章「语法分析」6 课：文法与推导、歧义与优先级、递归下降、Pratt 分析法、LL(1) 分析表、LR 分析 | 可用 |
 | 第 3 章「语义分析」3 课：作用域与符号表、类型检查、类型推导（Hindley–Milner） | 可用 |
 | 第 4 章「中间表示」4 课：三地址码、基本块与控制流图、支配树、SSA 形式 | 可用 |
+| 第 5 章「优化」5 课：常量折叠与代数化简、数据流分析、死代码消除、格与不动点、稀疏条件常量传播 | 可用 |
 | 第 3–7 章（语义、中间表示、优化、后端、运行时） | 规划中，目录已列出 |
 | 黑话编译器 | 设计中（设计预览页可看） |
 
@@ -37,7 +38,7 @@ crates/bsc-core   公共基础：源码位置、诊断信息
 crates/bsc-calc   计算器语言：最小但完整的编译器
 crates/bsc-automata  有限自动机：正则 → NFA → DFA → 最小 DFA → 词法分析器
 crates/bsc-grammar   文法工具：Earley、FIRST/FOLLOW、LL(1)、LR(0)/SLR
-crates/bsc-minilang  教学语言 mini-lang（词法、语法、语义分析，三地址码、控制流图、支配树、SSA）
+crates/bsc-minilang  教学语言 mini-lang（词法、语法、语义分析，三地址码、控制流图、支配树、SSA，数据流分析与优化）
 crates/bsc-types     迷你 ML + Hindley–Milner 类型推导
 crates/bsc-app    图形界面（原生 + Web）
 ```
