@@ -16,7 +16,8 @@
 | 第 3 章「语义分析」3 课：作用域与符号表、类型检查、类型推导（Hindley–Milner） | 可用 |
 | 第 4 章「中间表示」4 课：三地址码、基本块与控制流图、支配树、SSA 形式 | 可用 |
 | 第 5 章「优化」5 课：常量折叠与代数化简、数据流分析、死代码消除、格与不动点、稀疏条件常量传播 | 可用 |
-| 第 3–7 章（语义、中间表示、优化、后端、运行时） | 规划中，目录已列出 |
+| 第 6 章「后端」4 课：栈式虚拟机、指令选择、寄存器分配、函数调用约定（RISC-V 汇编 + 内置模拟器） | 可用 |
+| 第 7 章「运行时」3 课：引用计数、标记-清除、三色标记与写屏障 | 可用 |
 | 黑话编译器 | 设计中（设计预览页可看） |
 
 ## 运行
@@ -38,8 +39,9 @@ crates/bsc-core   公共基础：源码位置、诊断信息
 crates/bsc-calc   计算器语言：最小但完整的编译器
 crates/bsc-automata  有限自动机：正则 → NFA → DFA → 最小 DFA → 词法分析器
 crates/bsc-grammar   文法工具：Earley、FIRST/FOLLOW、LL(1)、LR(0)/SLR
-crates/bsc-minilang  教学语言 mini-lang（词法、语法、语义分析，三地址码、控制流图、支配树、SSA，数据流分析与优化）
+crates/bsc-minilang  教学语言 mini-lang（词法、语法、语义分析，三地址码、控制流图、支配树、SSA，数据流分析与优化，字节码虚拟机、RISC-V 后端与模拟器）
 crates/bsc-types     迷你 ML + Hindley–Milner 类型推导
+crates/bsc-runtime   垃圾回收模拟器（引用计数、标记-清除、三色增量标记）
 crates/bsc-app    图形界面（原生 + Web）
 ```
 

@@ -6,6 +6,8 @@ mod ch2;
 mod ch3;
 mod ch4;
 mod ch5;
+mod ch6;
+mod ch7;
 
 use eframe::egui::{self, RichText, ScrollArea, Ui};
 
@@ -37,10 +39,6 @@ pub struct Chapter {
 
 const fn ready(id: &'static str, title: &'static str, level: Level) -> LessonMeta {
     LessonMeta { id, title, level, ready: true, preview: "" }
-}
-
-const fn planned(id: &'static str, title: &'static str, level: Level, preview: &'static str) -> LessonMeta {
-    LessonMeta { id, title, level, ready: false, preview }
 }
 
 pub const COURSE: &[Chapter] = &[
@@ -106,15 +104,19 @@ pub const COURSE: &[Chapter] = &[
     Chapter {
         title: "第 6 章 · 后端：生成机器指令",
         lessons: &[
-            planned("6.1", "栈式虚拟机", Level::Basic, "字节码的设计与解释执行；和 JVM、WebAssembly 的对照。"),
-            planned("6.2", "指令选择", Level::Advanced, "树模式匹配：把中间表示覆盖成目标机器指令。"),
-            planned("6.3", "寄存器分配", Level::Advanced, "活跃区间、线性扫描、干涉图着色的动画演示。"),
-            planned("6.4", "函数调用约定", Level::Advanced, "栈帧、参数传递、调用者/被调用者保存寄存器。"),
+            ready("6.1", "栈式虚拟机", Level::Basic),
+            ready("6.2", "指令选择", Level::Advanced),
+            ready("6.3", "寄存器分配", Level::Advanced),
+            ready("6.4", "函数调用约定", Level::Advanced),
         ],
     },
     Chapter {
         title: "第 7 章 · 运行时（选修）",
-        lessons: &[planned("7.1", "垃圾回收", Level::Advanced, "引用计数、标记-清除、三色标记与写屏障。")],
+        lessons: &[
+            ready("7.1", "引用计数", Level::Basic),
+            ready("7.2", "标记-清除", Level::Basic),
+            ready("7.3", "三色标记与写屏障", Level::Advanced),
+        ],
     },
 ];
 
@@ -126,6 +128,8 @@ pub struct LearnPage {
     ch3: ch3::Chapter,
     ch4: ch4::Chapter,
     ch5: ch5::Chapter,
+    ch6: ch6::Chapter,
+    ch7: ch7::Chapter,
 }
 
 impl Default for LearnPage {
@@ -138,6 +142,8 @@ impl Default for LearnPage {
             ch3: ch3::Chapter::default(),
             ch4: ch4::Chapter::default(),
             ch5: ch5::Chapter::default(),
+            ch6: ch6::Chapter::default(),
+            ch7: ch7::Chapter::default(),
         }
     }
 }
@@ -215,6 +221,13 @@ impl LearnPage {
             "5.3" => self.ch5.dce.ui(ui),
             "5.4" => self.ch5.lattice.ui(ui),
             "5.5" => self.ch5.sccp.ui(ui),
+            "6.1" => self.ch6.vm.ui(ui),
+            "6.2" => self.ch6.isel.ui(ui),
+            "6.3" => self.ch6.regalloc.ui(ui),
+            "6.4" => self.ch6.calling.ui(ui),
+            "7.1" => self.ch7.rc.ui(ui),
+            "7.2" => self.ch7.mark.ui(ui),
+            "7.3" => self.ch7.tricolor.ui(ui),
             _ => planned_lesson(ui, meta),
         }
     }

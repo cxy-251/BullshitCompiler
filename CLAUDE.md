@@ -25,7 +25,9 @@ crates/
   bsc-grammar  上下文无关文法工具：文法文本解析、Earley（任意 CFG，给出全部语法树）、最左推导、随机造句、FIRST/FOLLOW、LL(1)、LR(0)/SLR；第 2 章用。Earley 以后也给黑话编译器用
   bsc-minilang 教学语言 mini-lang：手写词法分析器（1.1 课）+ 语法分析器（语句递归下降、表达式 Pratt、恐慌模式与插入式错误恢复；2.3/2.4 课）+ 语义分析 sema.rs（作用域链、符号表、名字解析、类型检查，Error 类型防连锁报错；3.1/3.2 课）
                + ir（三地址码）→ cfg（基本块、控制流图）→ dom（支配树、支配边界）→ ssa（半剪枝 SSA）；interp 直接执行控制流图，用来对照测试（第 4 章）
-               + dataflow（通用 gen/kill 工作表求解：活跃变量、到达定值）→ opt（局部常量/复制传播、折叠、代数化简、分支折叠、DCE）→ sccp（第 5 章）。AST 是统一的节点数组（NodeKind + children）
+               + dataflow（通用 gen/kill 工作表求解：活跃变量、到达定值）→ opt（局部常量/复制传播、折叠、代数化简、分支折叠、DCE）→ sccp（第 5 章）
+               + bytecode（栈式字节码 + VM）、rv（RISC-V 指令选择）→ regalloc（线性扫描/图着色、溢出、栈帧）→ sim（RV64 子集模拟器）（第 6 章）。AST 是统一的节点数组（NodeKind + children）
+  bsc-runtime  垃圾回收模拟器：小脚本描述堆操作，引用计数 / 标记-清除 / 三色增量标记（写屏障可开关），每步堆快照；第 7 章用
   bsc-types    迷你 ML（不写类型的函数式小语言）+ Hindley–Milner 类型推导（合一、occurs check、实例化、let 泛化，全程事件记录）；3.3 课用
   bsc-app    eframe/egui 图形界面，原生与 wasm 共用一份代码
     src/app.rs          顶栏 + 三个页面（学习 / 实验台 / 黑话编译器），状态持久化
@@ -39,6 +41,8 @@ crates/
     src/pages/learn/ch3/ 第 3 章各课（scope/typeck/infer；mod.rs 里的 Front 跑一遍 mini-lang 前端）
     src/pages/learn/ch4/ 第 4 章各课（tac/cfg/dom/ssa；mod.rs 里的 IrFront、控制流图画法、基本块卡片）
     src/pages/learn/ch5/ 第 5 章各课（fold/dataflow/dce/lattice/sccp；mod.rs 里的例子程序和 run_check：用解释器对照优化前后）
+    src/pages/learn/ch6/ 第 6 章各课（vm/isel/regalloc/calling）
+    src/pages/learn/ch7/ 第 7 章各课（rc/mark/tricolor；mod.rs 里的 GcDemo：脚本 + 回放 + 堆图）
     src/grammar_view.rs 第 2 章共用：文法编辑器、句子切分、产生式列表
     src/widgets/        通用组件：Stepper 播放器、源码高亮、树布局、状态图（graph_view：分层布局、自环、回边弧线）、
                         栈、测验、诊断展示、chip 小卡片、prose（反引号 → 行内代码）
@@ -46,7 +50,7 @@ crates/
     assets/fonts/       裁剪后的思源黑体 + JetBrains Mono（OFL，裁剪方法见其 README）
     index.html          trunk 的入口页
 ```
-计划新增：`bsc-jargon`（黑话编译器）；`bsc-minilang` 逐步补上优化、后端。
+计划新增：`bsc-jargon`（黑话编译器）。
 
 ## 技术选型（已定）
 - 界面：**egui / eframe 0.36**（glow 后端）。注意 0.36 的 API：`App::ui(&mut self, ui, frame)`；面板用 `egui::Panel::left/top(..).show(ui, ..)`、`CentralPanel::default().show(ui, ..)`（`show_inside` 已弃用）。
@@ -104,7 +108,8 @@ CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查；`p
 - [x] M3 第 3 章语义：3.1 作用域与符号表、3.2 类型检查、3.3 类型推导（HM）
 - [x] M4 第 4 章中间表示：4.1 三地址码、4.2 基本块与控制流图、4.3 支配树、4.4 SSA
 - [x] M5 第 5 章优化：5.1 常量折叠与代数化简、5.2 数据流分析、5.3 死代码消除、5.4 格与不动点、5.5 SCCP
-- [ ] M6 起：黑话编译器 v1；第 6 章后端（字节码 VM、RISC-V 汇编 + 内置模拟器、寄存器分配）
+- [x] M6 第 6 章后端：6.1 栈式虚拟机、6.2 指令选择、6.3 寄存器分配、6.4 调用约定；第 7 章运行时：7.1 引用计数、7.2 标记-清除、7.3 三色标记与写屏障（课程第 0–7 章全部完成）
+- [ ] M7 起：黑话编译器 v1
 
 ## 协作约定
 - 用户已授权技术决策由 Claude 决定；大的方向变化仍先和用户沟通。
