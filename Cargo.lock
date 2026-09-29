@@ -223,6 +223,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "bsc-automata"
+version = "0.1.0"
+dependencies = [
+ "bsc-core",
+]
+
+[[package]]
 name = "bsc-calc"
 version = "0.1.0"
 dependencies = [

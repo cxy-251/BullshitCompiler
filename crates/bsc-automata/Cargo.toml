@@ -1,0 +1,14 @@
+[package]
+name = "bsc-automata"
+description = "有限自动机：正则表达式 → NFA（Thompson 构造）→ DFA（子集构造）→ 最小化，以及词法分析器生成；每个算法都记录逐步过程"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bsc-core = { path = "../bsc-core" }
+
+[lints]
+workspace = true
