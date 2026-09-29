@@ -53,12 +53,7 @@ pub const COURSE: &[Chapter] = &[
     Chapter {
         title: "第 1 章 · 词法分析：让机器认字",
         lessons: &[
-            planned(
-                "1.1",
-                "手写一个扫描器",
-                Level::Basic,
-                "逐字符扫描、最长匹配、关键字与标识符的区分、记录源码位置。",
-            ),
+            ready("1.1", "手写一个扫描器", Level::Basic),
             ready("1.2", "正则表达式", Level::Basic),
             ready("1.3", "NFA：非确定有限自动机", Level::Basic),
             ready("1.4", "DFA 与子集构造", Level::Advanced),
@@ -180,6 +175,7 @@ impl LearnPage {
         };
         match meta.id {
             "0.1" => self.ch0.ui(ui),
+            "1.1" => self.ch1.scanner.ui(ui),
             "1.2" => self.ch1.regex.ui(ui),
             "1.3" => self.ch1.nfa.ui(ui),
             "1.4" => self.ch1.dfa.ui(ui),

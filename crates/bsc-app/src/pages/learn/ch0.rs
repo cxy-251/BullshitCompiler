@@ -1,11 +1,11 @@
 //! 第 0 课：编译器是什么。
 
 use bsc_calc::{Compilation, Stage};
-use eframe::egui::{self, CornerRadius, Frame, Margin, RichText, Stroke, TextEdit, Ui};
+use eframe::egui::{Color32, RichText, Stroke, TextEdit, Ui};
 
 use crate::calc_view::{StageSteppers, stage_view};
 use crate::theme::{Palette, mono};
-use crate::widgets::{CalloutKind, callout, card, quiz};
+use crate::widgets::{CalloutKind, callout, card, chip, chip_button, quiz};
 
 const STAGES: [Stage; 4] = [Stage::Lex, Stage::Parse, Stage::Codegen, Stage::Run];
 
@@ -179,7 +179,7 @@ impl Lesson {
         });
 
         ui.add_space(12.0);
-        ui.label(RichText::new("下一课：第 1 章 词法分析——让机器认字（规划中）").color(p.muted));
+        ui.label(RichText::new("下一课：第 1 章 词法分析——让机器认字，从 1.1「手写一个扫描器」开始。").color(p.muted));
         ui.add_space(24.0);
     }
 
@@ -189,11 +189,7 @@ impl Lesson {
         let failed = self.comp.error().map(|(s, _)| s);
         ui.horizontal_wrapped(|ui| {
             for (i, item) in data.iter().enumerate() {
-                Frame::new()
-                    .stroke(Stroke::new(1.0, p.card_stroke))
-                    .corner_radius(CornerRadius::same(6))
-                    .inner_margin(Margin::symmetric(8, 4))
-                    .show(ui, |ui| ui.add(egui::Label::new(RichText::new(*item).color(p.muted)).extend()));
+                chip(ui, RichText::new(*item).color(p.muted), Color32::TRANSPARENT, Stroke::new(1.0, p.card_stroke));
                 if let Some(&stage) = STAGES.get(i) {
                     ui.label(RichText::new("→").color(p.muted));
                     let selected = self.stage == stage;
@@ -202,14 +198,8 @@ impl Lesson {
                     if failed == Some(stage) {
                         text = text.color(p.error);
                     }
-                    let clicked = Frame::new()
-                        .fill(fill)
-                        .stroke(Stroke::new(if selected { 2.0 } else { 1.0 }, p.accent))
-                        .corner_radius(CornerRadius::same(6))
-                        .inner_margin(Margin::symmetric(10, 6))
-                        .show(ui, |ui| ui.add(egui::Label::new(text).extend().sense(egui::Sense::click())))
-                        .inner
-                        .clicked();
+                    let clicked =
+                        chip_button(ui, text, fill, Stroke::new(if selected { 2.0 } else { 1.0 }, p.accent)).clicked();
                     if clicked {
                         self.stage = stage;
                     }

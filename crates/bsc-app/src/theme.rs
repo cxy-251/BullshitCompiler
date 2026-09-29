@@ -9,6 +9,7 @@ pub struct Palette {
     pub number: Color32,
     pub operator: Color32,
     pub paren: Color32,
+    pub keyword: Color32,
     pub muted: Color32,
     pub accent: Color32,
     /// 当前步骤的高亮背景。
@@ -71,6 +72,7 @@ impl Palette {
         number: Color32::from_rgb(0x1a, 0x6f, 0xc4),
         operator: Color32::from_rgb(0xb4, 0x3c, 0x8c),
         paren: Color32::from_rgb(0x8a, 0x6a, 0x00),
+        keyword: Color32::from_rgb(0x8e, 0x3f, 0xc8),
         muted: Color32::from_rgb(0x70, 0x74, 0x7c),
         accent: Color32::from_rgb(0x2f, 0x6f, 0xeb),
         focus_bg: Color32::from_rgb(0xff, 0xe0, 0x8a),
@@ -91,6 +93,7 @@ impl Palette {
         number: Color32::from_rgb(0x6c, 0xb6, 0xff),
         operator: Color32::from_rgb(0xf0, 0x8c, 0xd0),
         paren: Color32::from_rgb(0xe8, 0xc5, 0x5c),
+        keyword: Color32::from_rgb(0xc3, 0x9b, 0xff),
         muted: Color32::from_rgb(0x94, 0x98, 0xa0),
         accent: Color32::from_rgb(0x6c, 0x9c, 0xff),
         focus_bg: Color32::from_rgb(0x6b, 0x55, 0x10),

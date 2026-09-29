@@ -7,8 +7,8 @@ use eframe::egui::{self, RichText, TextEdit, Ui};
 use crate::automata_view::min_graph;
 use crate::theme::{Palette, mono};
 use crate::widgets::{
-    CalloutKind, GEdgeStyle, GNodeStyle, Mark, Stepper, callout, card, diagnostic_view, graph_view, prose, prose_sized,
-    quiz, source_view,
+    CalloutKind, GEdgeStyle, GNodeStyle, Mark, Stepper, callout, card, chip, diagnostic_view, graph_view, prose,
+    prose_sized, quiz, source_view,
 };
 
 struct RuleRow {
@@ -321,17 +321,14 @@ impl Lesson {
                 ui.label(RichText::new("（还没有）").color(p.muted));
             }
             for (l, _) in shown {
-                egui::Frame::new()
-                    .fill(p.category(l.rule))
-                    .corner_radius(egui::CornerRadius::same(5))
-                    .inner_margin(egui::Margin::symmetric(8, 2))
-                    .show(ui, |ui| {
-                        ui.label(
-                            RichText::new(format!("{} {}", rule_name(l.rule), l.span.text(&self.input)))
-                                .font(mono(15.0))
-                                .color(p.text),
-                        );
-                    });
+                chip(
+                    ui,
+                    RichText::new(format!("{} {}", rule_name(l.rule), l.span.text(&self.input)))
+                        .font(mono(15.0))
+                        .color(p.text),
+                    p.category(l.rule),
+                    egui::Stroke::NONE,
+                );
             }
         });
         if k == scan.events.len()

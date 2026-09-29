@@ -2,13 +2,13 @@
 
 use bsc_automata::dfa::Dfa;
 use bsc_automata::minimize::{MinStep, Minimization};
-use eframe::egui::{CornerRadius, Frame, Margin, RichText, Ui};
+use eframe::egui::{RichText, Stroke, Ui};
 
 use crate::automata_view::{RegexPipeline, dfa_graph, dfa_name, min_graph, regex_input, show_pipeline_error};
 use crate::theme::{Palette, mono};
 use crate::widgets::{
-    CalloutKind, GEdge, GEdgeStyle, GNode, GNodeStyle, Graph, Stepper, callout, card, graph_view, prose, prose_sized,
-    quiz,
+    CalloutKind, GEdge, GEdgeStyle, GNode, GNodeStyle, Graph, Stepper, callout, card, chip, graph_view, prose,
+    prose_sized, quiz,
 };
 
 const PRESETS: &[(&str, &str)] =
@@ -191,17 +191,12 @@ impl Lesson {
         };
         ui.horizontal_wrapped(|ui| {
             for (bi, b) in blocks.iter().enumerate() {
-                Frame::new()
-                    .fill(p.category(bi))
-                    .corner_radius(CornerRadius::same(6))
-                    .inner_margin(Margin::symmetric(8, 3))
-                    .show(ui, |ui| {
-                        ui.label(
-                            RichText::new(format!("组{} {}", bi + 1, block_text(dfa, b)))
-                                .font(mono(14.0))
-                                .color(p.text),
-                        );
-                    });
+                chip(
+                    ui,
+                    RichText::new(format!("组{} {}", bi + 1, block_text(dfa, b))).font(mono(14.0)).color(p.text),
+                    p.category(bi),
+                    Stroke::NONE,
+                );
             }
         });
 

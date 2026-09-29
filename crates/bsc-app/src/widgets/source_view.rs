@@ -1,7 +1,7 @@
 //! 带高亮的源码视图：给指定区间上色、加背景，用来指出"现在处理到源码的哪一段"。
 
 use bsc_core::Span;
-use eframe::egui::{Color32, Response, Ui, text::LayoutJob};
+use eframe::egui::{self, Color32, Response, Ui, text::LayoutJob};
 
 use crate::theme::{Palette, mono};
 
@@ -56,7 +56,9 @@ pub fn source_view(ui: &mut Ui, source: &str, colors: &[(Span, Color32)], marks:
         job.append(" ", 0.0, fmt(font, p.muted, Color32::TRANSPARENT));
     }
 
-    ui.label(job)
+    // 注意：`ui.columns` 里的布局是两端对齐（justify）的，egui 两端对齐时会去掉每行开头的空白，
+    // 代码的缩进就没了。所以这里显式换成普通的左对齐布局。
+    ui.with_layout(egui::Layout::top_down(egui::Align::Min), |ui| ui.label(job)).inner
 }
 
 fn fmt(font_id: eframe::egui::FontId, color: Color32, background: Color32) -> eframe::egui::TextFormat {

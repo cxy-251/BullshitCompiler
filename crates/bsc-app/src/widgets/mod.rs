@@ -24,6 +24,12 @@ pub fn prose(ui: &mut Ui, text: &str) -> Response {
 }
 
 pub fn prose_sized(ui: &mut Ui, text: &str, size: f32) -> Response {
+    let color = Palette::of(ui).text;
+    prose_colored(ui, text, size, color)
+}
+
+/// 同 [`prose`]，但指定文字颜色。
+pub fn prose_colored(ui: &mut Ui, text: &str, size: f32, color: Color32) -> Response {
     let p = Palette::of(ui);
     let mut job = LayoutJob::default();
     for (i, part) in text.split('`').enumerate() {
@@ -31,9 +37,9 @@ pub fn prose_sized(ui: &mut Ui, text: &str, size: f32) -> Response {
             continue;
         }
         let format = if i % 2 == 1 {
-            TextFormat { font_id: mono(size * 0.95), color: p.text, background: p.code_bg, ..Default::default() }
+            TextFormat { font_id: mono(size * 0.95), color, background: p.code_bg, ..Default::default() }
         } else {
-            TextFormat { font_id: FontId::proportional(size), color: p.text, ..Default::default() }
+            TextFormat { font_id: FontId::proportional(size), color, ..Default::default() }
         };
         job.append(part, 0.0, format);
     }
@@ -144,7 +150,7 @@ pub fn diagnostic_view(ui: &mut Ui, source: &str, d: &Diagnostic) {
             Severity::Warning | Severity::Note => p.paren,
         };
         let code = d.code.map(|c| format!("[{c}]")).unwrap_or_default();
-        ui.label(RichText::new(format!("{}{}：{}", d.severity.as_str(), code, d.message)).color(sev).strong());
+        prose_colored(ui, &format!("{}{}：{}", d.severity.as_str(), code, d.message), 16.0, sev);
 
         let marks: Vec<Mark> = d
             .labels
@@ -156,13 +162,13 @@ pub fn diagnostic_view(ui: &mut Ui, source: &str, d: &Diagnostic) {
         for l in &d.labels {
             let lc = line_col(source, l.span.start);
             let tag = if l.primary { "▲" } else { "△" };
-            ui.label(format!("{tag} 第 {} 行第 {} 列：{}", lc.line, lc.col, l.message));
+            prose(ui, &format!("{tag} 第 {} 行第 {} 列：{}", lc.line, lc.col, l.message));
         }
         for n in &d.notes {
-            ui.label(RichText::new(format!("注：{n}")).color(p.muted));
+            prose_colored(ui, &format!("注：{n}"), 15.0, p.muted);
         }
         if let Some(h) = &d.help {
-            ui.label(RichText::new(format!("帮助：{h}")).color(p.ok));
+            prose_colored(ui, &format!("帮助：{h}"), 15.0, p.ok);
         }
         egui::CollapsingHeader::new(RichText::new("在终端里它长这样").small())
             .id_salt(("diag_term", d.message.as_str()))
@@ -213,6 +219,19 @@ pub fn stack_view(ui: &mut Ui, stack: &[i64], highlight_top: bool) {
             );
         }
     }
+}
+
+/// 一个"小卡片"：带底色和边框的一小段文字（记号、分组等）。
+///
+/// 用 `Button` 而不是 `Frame` 实现：egui 的自动换行布局只能在放置"单个控件"之前判断放不放得下，
+/// `Frame` 是容器，放进 `horizontal_wrapped` 里不会换行，会把一行撑出界。
+pub fn chip(ui: &mut Ui, text: RichText, fill: Color32, stroke: Stroke) -> Response {
+    ui.add(egui::Button::new(text).fill(fill).stroke(stroke).corner_radius(CornerRadius::same(5)).sense(Sense::hover()))
+}
+
+/// 可点击的小卡片。
+pub fn chip_button(ui: &mut Ui, text: RichText, fill: Color32, stroke: Stroke) -> Response {
+    ui.add(egui::Button::new(text).fill(fill).stroke(stroke).corner_radius(CornerRadius::same(6)))
 }
 
 /// 小标签（"入门""进阶""规划中"等）。

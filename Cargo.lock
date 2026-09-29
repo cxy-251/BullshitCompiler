@@ -216,6 +216,7 @@ dependencies = [
  "bsc-automata",
  "bsc-calc",
  "bsc-core",
+ "bsc-minilang",
  "eframe",
  "env_logger",
  "log",
@@ -240,6 +241,13 @@ dependencies = [
 [[package]]
 name = "bsc-core"
 version = "0.1.0"
+
+[[package]]
+name = "bsc-minilang"
+version = "0.1.0"
+dependencies = [
+ "bsc-core",
+]
 
 [[package]]
 name = "bumpalo"

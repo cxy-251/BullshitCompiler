@@ -5,10 +5,12 @@ pub mod lexgen;
 pub mod minimize;
 pub mod nfa;
 pub mod regex;
+pub mod scanner;
 
 /// 第 1 章各课的状态。
 #[derive(Default)]
 pub struct Chapter {
+    pub scanner: scanner::Lesson,
     pub regex: regex::Lesson,
     pub nfa: nfa::Lesson,
     pub dfa: dfa::Lesson,

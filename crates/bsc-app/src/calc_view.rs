@@ -8,11 +8,12 @@ use bsc_calc::codegen::Instr;
 use bsc_calc::lexer::{Token, TokenKind};
 use bsc_calc::parser::{ParseEvent, Rule};
 use bsc_calc::{Compilation, Span, Stage};
-use eframe::egui::{self, CornerRadius, Frame, Margin, RichText, Stroke, Ui};
+use eframe::egui::{self, RichText, Stroke, Ui};
 
 use crate::theme::{Palette, mono};
 use crate::widgets::{
-    Mark, NodeStyle, Stepper, TreeNode, card, diagnostic_view, prose_sized, scrollable_tree, source_view, stack_view,
+    Mark, NodeStyle, Stepper, TreeNode, card, chip, diagnostic_view, prose_sized, scrollable_tree, source_view,
+    stack_view,
 };
 
 /// 四个阶段各自的播放器。
@@ -128,13 +129,12 @@ pub fn token_chip(ui: &mut Ui, t: &Token, current: bool) -> egui::Response {
         TokenKind::Eof => "结束".to_owned(),
         k => k.symbol().to_owned(),
     };
-    Frame::new()
-        .fill(if current { p.focus_bg } else { p.node_fill })
-        .stroke(Stroke::new(if current { 2.0 } else { 1.0 }, color))
-        .corner_radius(CornerRadius::same(5))
-        .inner_margin(Margin::symmetric(8, 2))
-        .show(ui, |ui| ui.add(egui::Label::new(RichText::new(text).font(mono(15.0)).color(color)).extend()))
-        .response
+    chip(
+        ui,
+        RichText::new(text).font(mono(15.0)).color(color),
+        if current { p.focus_bg } else { p.node_fill },
+        Stroke::new(if current { 2.0 } else { 1.0 }, color),
+    )
 }
 
 // ---------------------------------------------------------------------------

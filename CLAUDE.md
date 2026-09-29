@@ -21,23 +21,34 @@
 crates/
   bsc-core   公共基础：Span、行列换算、Diagnostic 及其终端渲染
   bsc-calc   计算器语言：最小完整编译器（lexer → 递归下降 parser → AST → 栈机代码生成 → VM），第 0 课和实验台用
+  bsc-automata 正则 → NFA（Thompson）→ DFA（子集构造）→ 最小化（Moore 划分细化）→ 多规则词法分析器生成（最长匹配 + 优先级），全部带逐步记录；第 1 章用
+  bsc-minilang 教学语言 mini-lang。目前只有手写词法分析器（带逐步记录，1.1 课用）；语法/语义/IR 随课程加入
   bsc-app    eframe/egui 图形界面，原生与 wasm 共用一份代码
     src/app.rs          顶栏 + 三个页面（学习 / 实验台 / 黑话编译器），状态持久化
     src/pages/learn/    课程目录（mod.rs 中的 COURSE）与各课内容（ch0.rs …）
     src/pages/lab.rs    类 Godbolt 的多栏联动视图
     src/pages/jargon.rs 黑话编译器页（目前是设计预览）
     src/calc_view.rs    计算器编译器各阶段的逐步回放视图
-    src/widgets/        通用组件：Stepper 播放器、源码高亮、树布局绘制、栈、测验、诊断展示、prose（反引号 → 行内代码）
+    src/automata_view.rs 第 1 章共用：正则流水线、自动机 → 状态图、正则输入框
+    src/pages/learn/ch1/ 第 1 章各课（scanner/regex/nfa/dfa/minimize/lexgen）
+    src/widgets/        通用组件：Stepper 播放器、源码高亮、树布局、状态图（graph_view：分层布局、自环、回边弧线）、
+                        栈、测验、诊断展示、chip 小卡片、prose（反引号 → 行内代码）
     src/theme.rs        语义化配色（亮/暗两套），界面里只用 Palette 的字段，不直接写颜色
     assets/fonts/       裁剪后的思源黑体 + JetBrains Mono（OFL，裁剪方法见其 README）
     index.html          trunk 的入口页
 ```
-计划新增：`bsc-automata`（正则/NFA/DFA/最小化）、`bsc-grammar`（FIRST/FOLLOW、LL(1)、LR）、`bsc-minilang`（带变量/函数/循环的教学语言，含 CFG/SSA/优化/后端）、`bsc-jargon`（黑话编译器）。
+计划新增：`bsc-grammar`（FIRST/FOLLOW、LL(1)、LR）、`bsc-jargon`（黑话编译器）；`bsc-minilang` 逐步补上语法分析、语义、CFG/SSA、优化、后端。
 
 ## 技术选型（已定）
 - 界面：**egui / eframe 0.36**（glow 后端）。注意 0.36 的 API：`App::ui(&mut self, ui, frame)`；面板用 `egui::Panel::left/top(..).show(ui, ..)`、`CentralPanel::default().show(ui, ..)`（`show_inside` 已弃用）。
 - 中文字体打包进程序（约 2.4 MB），Web 版 gzip 后总传输约 3.5 MB。字体子集只含 GB2312 + 常用符号；界面里用到的特殊符号要在子集范围内（如 ▶◀■→ 可用；✔⏸ 不在子集里，别用）。
-- `ui.set_max_width(x)` 会把区域**撑大**，要写成 `ui.set_max_width(ui.available_width().min(x))`。
+- egui 踩过的坑（都已在代码里处理，新代码照做）：
+  - `ui.set_max_width(x)` 会把区域**撑大**，要写成 `ui.set_max_width(ui.available_width().min(x))`。
+  - `ui.columns` 的每一栏是两端对齐布局，egui 两端对齐时会**删掉每行开头的空白**——显示代码要包一层 `Layout::top_down(Align::Min)`（`source_view` 已处理）。
+  - `Frame` 是容器，放在 `horizontal_wrapped` 里**不会换行**；一排小卡片用 `widgets::chip`（基于 `Button`）。
+  - `Grid` 的列宽取决于上一帧内容，里面的 `TextEdit` 要用 `ui.add_sized` 固定尺寸。
+  - 嵌套的纵向 `ScrollArea` 高度不可靠，课程页里别用。
+- 代码字体 JetBrains Mono 子集**去掉了连字**（否则 `<=` 显示成 `≤`）。
 - Rust edition 2024，MSRV 1.95；`rustfmt.toml` 行宽 120。
 
 ## 常用命令
@@ -65,7 +76,7 @@ CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查；`p
 
 ## 里程碑
 - [x] M0 骨架：workspace、eframe 应用（原生 + Web）、中文字体、CI/Pages/Release 工作流、计算器编译器 + 第 0 课 + 实验台 + 黑话编译器设计页
-- [ ] M1 第 1 章词法：`bsc-automata`（Thompson 构造、子集构造、Hopcroft 最小化，全部带步骤记录）+ 状态图可视化
+- [x] M1 第 1 章词法：1.1 手写扫描器（mini-lang 词法分析器）、1.2 正则、1.3 NFA/Thompson、1.4 DFA/子集构造、1.5 最小化、1.6 词法分析器生成；状态图组件
 - [ ] M2 第 2 章语法：文法工具（FIRST/FOLLOW、LL(1) 表、LR 自动机）+ Pratt；mini-lang 前端
 - [ ] M3 第 3 章语义：作用域、符号表、类型检查
 - [ ] M4–M5 中间表示与优化：三地址码、CFG、支配树、SSA、数据流框架、各优化 Pass

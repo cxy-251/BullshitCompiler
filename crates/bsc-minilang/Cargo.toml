@@ -1,0 +1,14 @@
+[package]
+name = "bsc-minilang"
+description = "mini-lang：课程使用的教学语言（变量、函数、分支、循环）。目前实现了手写词法分析器"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bsc-core = { path = "../bsc-core" }
+
+[lints]
+workspace = true
