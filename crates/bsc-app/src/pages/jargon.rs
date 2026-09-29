@@ -6,7 +6,7 @@
 
 use bsc_core::{Diagnostic, Span, line_col};
 use bsc_jargon::ir::{ClauseIr, Part, Template};
-use bsc_jargon::lexicon::{Cat, Lexicon};
+use bsc_jargon::lexicon::{Cat, Layer, Lexicon};
 use bsc_jargon::segment::Clause;
 use bsc_jargon::{Compilation, Compiler, EXAMPLE_BATCH, PRESETS, ai_prompt, grammar};
 use eframe::egui::{
@@ -64,7 +64,17 @@ pub struct JargonPage {
     ir_final: bool,
     /// 上一帧鼠标指向的原文区间。
     hover: Vec<Span>,
+    /// 本地词典文件夹里的批次（只有原生版有）。
+    files: Vec<Layer>,
+    /// 拖进来的文件（原生版是完整路径）。
+    source: Option<String>,
+    /// 最近一次操作的提示（保存到哪里了之类）。
+    notice: String,
+    /// 读完的拖入文件：(文件名, 内容)。
+    pending: Pending,
 }
+
+type Pending = std::sync::Arc<std::sync::Mutex<Vec<(String, Option<String>)>>>;
 
 impl Default for JargonPage {
     fn default() -> Self {
@@ -74,8 +84,9 @@ impl Default for JargonPage {
 
 impl JargonPage {
     pub fn with_saved(input: String, batch: String) -> Self {
-        let base = Compiler::builtin();
-        let comp = Compiler::with_extra(BATCH_NAME, &batch);
+        let files = local::load();
+        let base = Compiler::with_layers(files.clone());
+        let comp = Compiler::with_layers(with_batch(&files, &batch));
         let result = comp.compile(&input);
         let mut page = Self {
             input,
@@ -89,6 +100,10 @@ impl JargonPage {
             lookup: "抓手".to_owned(),
             ir_final: true,
             hover: vec![],
+            files,
+            source: None,
+            notice: String::new(),
+            pending: Pending::default(),
         };
         page.regress = page.regression();
         page
@@ -101,9 +116,63 @@ impl JargonPage {
     }
 
     fn set_batch(&mut self) {
-        self.comp = Compiler::with_extra(BATCH_NAME, &self.batch);
+        self.comp = Compiler::with_layers(with_batch(&self.files, &self.batch));
         self.regress = self.regression();
         self.recompile();
+    }
+
+    /// 本地词典文件夹变了：重新加载。
+    fn reload_files(&mut self) {
+        self.files = local::load();
+        self.base = Compiler::with_layers(self.files.clone());
+        self.set_batch();
+    }
+
+    /// 粘贴的批次在词典里是第几层。
+    fn batch_layer(&self) -> Option<usize> {
+        (!self.batch.trim().is_empty()).then(|| self.comp.lex.layers.len() - 1)
+    }
+
+    /// 拖进窗口的 txt 文件：读出来直接编译（Web 版是异步读取，读完后下一帧生效）。
+    fn take_dropped(&mut self, ui: &Ui) {
+        for f in ui.ctx().input(|i| i.raw.dropped_files.clone()) {
+            local::read_dropped(f, self.pending.clone(), ui.ctx().clone());
+        }
+        let done: Vec<(String, Option<String>)> =
+            self.pending.lock().map(|mut v| v.drain(..).collect()).unwrap_or_default();
+        for (name, text) in done {
+            match text {
+                Some(t) => {
+                    self.input = t.replace("\r\n", "\n");
+                    self.notice = format!("已载入 {name}");
+                    self.source = Some(name);
+                    self.recompile();
+                }
+                None => self.notice = format!("读不了 {name}"),
+            }
+        }
+    }
+
+    /// 译文 + 每处改动的说明，保存成 txt 时用。
+    fn report(&self) -> String {
+        let r = &self.result;
+        let mut s = r.output.clone();
+        s.push_str(&format!(
+            "\n\n———— 黑话编译器报告 ————\n原文 {} 字 → 译文 {} 字，水分 {:.0}%\n",
+            r.stats.chars_in,
+            r.stats.chars_out,
+            r.stats.water() * 100.0
+        ));
+        for run in &r.passes {
+            for ch in &run.changes {
+                let after = if ch.after.is_empty() { "（删掉）" } else { &ch.after };
+                s.push_str(&format!("[{}] {} → {}：{}\n", run.pass.name(), ch.before, after, ch.why));
+            }
+        }
+        for d in &r.diags {
+            s.push_str(&format!("[提醒] {}\n", d.message));
+        }
+        s
     }
 
     /// 加上扩充批次以后，哪些示例的译文变了。
@@ -127,6 +196,7 @@ impl JargonPage {
     }
 
     pub fn ui(&mut self, ui: &mut Ui) {
+        self.take_dropped(ui);
         let wide = ui.available_width() > 1000.0;
         let mut hover = Vec::new();
         if wide {
@@ -156,6 +226,13 @@ impl JargonPage {
         let p = Palette::of(ui);
         ui.heading("黑话编译器");
         ui.label(RichText::new("把故作高深的\"领导讲话\"编译成平凡质朴的大白话。").color(p.muted));
+        let dragging = ui.ctx().input(|i| !i.raw.hovered_files.is_empty());
+        let hint = if dragging {
+            "松开鼠标，载入这个文件"
+        } else {
+            "可以直接粘贴自己的文字，或者把 txt 文件拖进窗口"
+        };
+        ui.label(RichText::new(hint).color(if dragging { p.accent } else { p.muted }));
         ui.horizontal_wrapped(|ui| {
             ui.label(RichText::new("例子：").color(p.muted));
             for (name, text) in PRESETS {
@@ -193,6 +270,8 @@ impl JargonPage {
 
         ui.add_space(6.0);
         let r = &self.result;
+        let (mut copy, mut save) = (false, false);
+        let notice = self.notice.clone();
         card(ui, |ui| {
             ui.label(RichText::new("大白话").strong());
             ui.label(
@@ -223,10 +302,32 @@ impl JargonPage {
                     chip(ui, RichText::new(format!("{} {n}", run.pass.name())).size(13.0), fill, Stroke::NONE);
                 }
             });
+            if s.fallback > 0 {
+                ui.label(
+                    RichText::new(format!("{} 个分句的句式没认出来，只做了逐词处理（见下方提醒）。", s.fallback))
+                        .size(13.0)
+                        .color(p.paren),
+                );
+            }
+            ui.horizontal_wrapped(|ui| {
+                copy = ui.button("复制译文").clicked();
+                save = local::AVAILABLE && ui.button("保存译文和改动说明").clicked();
+            });
+            if !notice.is_empty() {
+                ui.label(RichText::new(&notice).size(13.0).color(p.ok));
+            }
             if r.residual.is_empty() && !r.output.is_empty() {
                 ui.label(RichText::new("自检通过：把译文重新分词，没有残留黑话。").size(13.0).color(p.muted));
             }
         });
+        if copy {
+            ui.ctx().copy_text(self.result.output.clone());
+            self.notice = "译文已复制".to_owned();
+        }
+        if save {
+            self.notice = local::save_output(self.source.as_deref(), &self.report());
+        }
+        let r = &self.result;
         for d in &r.diags {
             diagnostic_view(ui, &self.input, d);
         }
@@ -448,7 +549,7 @@ impl JargonPage {
                 }
             }
             None => {
-                ui.label(RichText::new("这个分句不在支持的句式范围内，见左边的错误信息。").color(p.error));
+                ui.label(RichText::new("这个分句的句式没认出来，只做了逐词处理，见左边的提醒。").color(p.paren));
             }
         }
         egui::CollapsingHeader::new("句式文法").id_salt("jargon_grammar").show(ui, |ui| {
@@ -479,8 +580,8 @@ impl JargonPage {
         for (ci, ir) in irs.iter().enumerate() {
             ui.add_space(4.0);
             card(ui, |ui| {
-                let status = if ir.failed {
-                    " · 句式分析失败，原样保留"
+                let status = if ir.fallback {
+                    " · 句式没认出来，只做了逐词处理"
                 } else if ir.merged {
                     " · 已合并进前一个分句"
                 } else if !ir.has_body() {
@@ -599,7 +700,8 @@ impl JargonPage {
 
         ui.add_space(6.0);
         ui.label(RichText::new("词典自己的校验结果").size(18.0).strong());
-        let diags: Vec<_> = lex.diags.iter().filter(|d| d.layer < 2).collect();
+        let batch = self.batch_layer();
+        let diags: Vec<_> = lex.diags.iter().filter(|d| Some(d.layer) != batch).collect();
         if diags.is_empty() {
             ui.label(RichText::new("没有问题。").color(p.ok));
         }
@@ -647,15 +749,17 @@ impl JargonPage {
         if ui.add(edit).changed() {
             self.set_batch();
         }
+        if local::AVAILABLE {
+            self.local_files(ui);
+        }
         let lex = &self.comp.lex;
-        let has_batch = lex.layers.len() > 2;
-        if has_batch {
-            let diags: Vec<_> = lex.diags.iter().filter(|d| d.layer == 2).collect();
+        if let Some(layer) = self.batch_layer() {
+            let diags: Vec<_> = lex.diags.iter().filter(|d| d.layer == layer).collect();
             let count = |sev| diags.iter().filter(|d| d.diag.severity == sev).count();
             ui.label(
                 RichText::new(format!(
                     "这一批收录 {} 条；错误 {}（没有收录）、警告 {}、提示 {}。",
-                    lex.count_by_layer(2),
+                    lex.count_by_layer(layer),
                     count(bsc_core::Severity::Error),
                     count(bsc_core::Severity::Warning),
                     count(bsc_core::Severity::Note)
@@ -677,7 +781,7 @@ impl JargonPage {
             ui.add_space(4.0);
             ui.label(RichText::new("逐条校验").size(18.0).strong());
             for d in diags {
-                lex_diag_view(ui, lex, 2, &d.diag);
+                lex_diag_view(ui, lex, layer, &d.diag);
             }
         }
         ui.add_space(8.0);
@@ -696,6 +800,182 @@ impl JargonPage {
                 ui.label(RichText::new(&prompt).font(mono(13.0)));
             },
         );
+    }
+}
+
+impl JargonPage {
+    /// 本地词典文件夹：每一批词条是一个 txt 文件，启动时自动加载。
+    fn local_files(&mut self, ui: &mut Ui) {
+        let p = Palette::of(ui);
+        ui.add_space(4.0);
+        card(ui, |ui| {
+            ui.label(RichText::new("本地词典文件夹").strong());
+            ui.label(RichText::new(local::dir_text()).font(mono(13.0)).color(p.muted));
+            ui.label(
+                RichText::new(
+                    "每一批词条是这里的一个 txt 文件，启动时自动加载（排在内置词典后面）。删掉文件就是停用这一批。",
+                )
+                .size(13.0)
+                .color(p.muted),
+            );
+            let mut remove = None;
+            for (i, f) in self.files.iter().enumerate() {
+                ui.horizontal(|ui| {
+                    let n = self.comp.lex.layers.iter().position(|l| l.name == f.name);
+                    let count = n.map_or(0, |n| self.comp.lex.count_by_layer(n));
+                    ui.label(format!("{}（{count} 条）", f.name));
+                    if ui.small_button("删除").clicked() {
+                        remove = Some(i);
+                    }
+                });
+            }
+            if let Some(i) = remove {
+                self.notice = local::remove(&self.files[i].name);
+                self.reload_files();
+            }
+            ui.horizontal_wrapped(|ui| {
+                let can_save = !self.batch.trim().is_empty();
+                if ui.add_enabled(can_save, egui::Button::new("把上面粘贴的词条存成新的一批")).clicked() {
+                    self.notice = local::save_batch(&self.batch);
+                    self.batch.clear();
+                    self.reload_files();
+                }
+                if ui.button("重新加载").clicked() {
+                    self.reload_files();
+                }
+            });
+            if !self.notice.is_empty() {
+                ui.label(RichText::new(&self.notice).size(13.0).color(p.ok));
+            }
+        });
+    }
+}
+
+fn with_batch(files: &[Layer], batch: &str) -> Vec<Layer> {
+    let mut v = files.to_vec();
+    v.push(Layer { name: BATCH_NAME.to_owned(), text: batch.to_owned() });
+    v
+}
+
+/// 本地文件：原生版读写磁盘；Web 版没有文件系统，这些功能不显示。
+#[cfg(not(target_arch = "wasm32"))]
+mod local {
+    use std::path::{Path, PathBuf};
+
+    use bsc_jargon::lexicon::Layer;
+
+    pub const AVAILABLE: bool = true;
+
+    fn dir() -> Option<PathBuf> {
+        eframe::storage_dir("BSc 编译原理实验室").map(|d| d.join("lexicon"))
+    }
+
+    pub fn dir_text() -> String {
+        dir().map_or("（找不到用户目录）".to_owned(), |d| d.display().to_string())
+    }
+
+    pub fn load() -> Vec<Layer> {
+        let Some(dir) = dir() else { return vec![] };
+        let Ok(rd) = std::fs::read_dir(&dir) else { return vec![] };
+        let mut files: Vec<PathBuf> =
+            rd.filter_map(|e| e.ok().map(|e| e.path())).filter(|p| p.extension().is_some_and(|x| x == "txt")).collect();
+        files.sort();
+        files
+            .into_iter()
+            .filter_map(|p| {
+                let text = read(&p)?;
+                Some(Layer { name: p.file_name()?.to_string_lossy().into_owned(), text })
+            })
+            .collect()
+    }
+
+    pub fn read(p: &Path) -> Option<String> {
+        std::fs::read(p).ok().map(|b| String::from_utf8_lossy(&b).into_owned())
+    }
+
+    pub fn read_dropped(f: eframe::egui::DroppedFileHandle, sink: super::Pending, _: eframe::egui::Context) {
+        let text = f.bytes().ok().map(|b| String::from_utf8_lossy(&b).into_owned());
+        if let Ok(mut v) = sink.lock() {
+            v.push((f.path().display().to_string(), text));
+        }
+    }
+
+    pub fn save_batch(text: &str) -> String {
+        let Some(dir) = dir() else { return "找不到用户目录，没有保存".to_owned() };
+        if let Err(e) = std::fs::create_dir_all(&dir) {
+            return format!("建不了文件夹：{e}");
+        }
+        let path = (1..).map(|n| dir.join(format!("batch-{n:03}.txt"))).find(|p| !p.exists()).unwrap();
+        match std::fs::write(&path, text) {
+            Ok(()) => format!("已保存到 {}", path.display()),
+            Err(e) => format!("保存失败：{e}"),
+        }
+    }
+
+    pub fn remove(name: &str) -> String {
+        let Some(dir) = dir() else { return String::new() };
+        match std::fs::remove_file(dir.join(name)) {
+            Ok(()) => format!("已删除 {name}"),
+            Err(e) => format!("删除失败：{e}"),
+        }
+    }
+
+    /// 保存译文：拖进来的文件旁边存一份"原名.大白话.txt"，否则存到应用的数据文件夹。
+    pub fn save_output(source: Option<&str>, report: &str) -> String {
+        let path = match source.map(Path::new).filter(|p| p.is_absolute()) {
+            Some(p) => {
+                let stem = p.file_stem().map_or("译文".into(), |s| s.to_string_lossy().into_owned());
+                p.with_file_name(format!("{stem}.大白话.txt"))
+            }
+            None => match dir().and_then(|d| d.parent().map(|p| p.join("大白话.txt"))) {
+                Some(p) => p,
+                None => return "找不到用户目录，没有保存".to_owned(),
+            },
+        };
+        if let Some(parent) = path.parent() {
+            let _ = std::fs::create_dir_all(parent);
+        }
+        match std::fs::write(&path, report) {
+            Ok(()) => format!("已保存到 {}", path.display()),
+            Err(e) => format!("保存失败：{e}"),
+        }
+    }
+}
+
+#[cfg(target_arch = "wasm32")]
+mod local {
+    use bsc_jargon::lexicon::Layer;
+
+    pub const AVAILABLE: bool = false;
+
+    pub fn dir_text() -> String {
+        String::new()
+    }
+
+    pub fn load() -> Vec<Layer> {
+        vec![]
+    }
+
+    pub fn read_dropped(f: eframe::egui::DroppedFileHandle, sink: super::Pending, ctx: eframe::egui::Context) {
+        wasm_bindgen_futures::spawn_local(async move {
+            let text = f.bytes_async().await.ok().map(|b| String::from_utf8_lossy(&b).into_owned());
+            if let Ok(mut v) = sink.lock() {
+                v.push((f.path().display().to_string(), text));
+            }
+            ctx.request_repaint();
+        });
+    }
+
+    pub fn save_batch(_: &str) -> String {
+        String::new()
+    }
+
+    pub fn remove(_: &str) -> String {
+        String::new()
+    }
+
+    pub fn save_output(_: Option<&str>, _: &str) -> String {
+        String::new()
     }
 }
 
@@ -768,7 +1048,7 @@ const HARD: &[(&str, &str)] = &[
         "可解释、可复现",
         "每一处改动都有理由；同一个词在全文里译法一致；同样的输入永远得到同样的输出，再编译一遍结果不变。",
     ),
-    ("知道自己不会", "超出支持句式的分句给出诊断、原样保留，而不是硬凑一个译文。"),
+    ("知道自己不会", "句式没认出来的分句退回逐词处理，并明确提醒哪一句只做了词语级的处理。"),
 ];
 
 const MAPPING: &[(&str, &str, &str)] = &[

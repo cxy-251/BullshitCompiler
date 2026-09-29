@@ -95,8 +95,10 @@ pub struct ClauseIr {
     /// 前置的主语、情态词。
     pub pre: Vec<usize>,
     pub parts: Vec<Part>,
-    /// 句式分析失败：原样保留。
-    pub failed: bool,
+    /// 句式分析失败，退回逐词处理（只删修饰语、折叠固定搭配、降级单个词，不做句式改写和合并）。
+    pub fallback: bool,
+    /// 行首的编号、项目符号（"一是""1.""（二）""•"），原样保留。
+    pub marker: String,
     /// 被合并进别的分句（公共子表达式消除）。
     pub merged: bool,
     /// 分句后面的标点。
@@ -128,9 +130,40 @@ pub fn words_of(tokens: &[Token], lex: &Lexicon) -> Vec<Word> {
 
 /// 把语法树翻译成语义块。
 pub fn lower_tree(g: &Grammar, tree: &Tree, words: Vec<Word>, punct: String, ends_sentence: bool) -> ClauseIr {
-    let mut ir = ClauseIr { words, pre: vec![], parts: vec![], failed: false, merged: false, punct, ends_sentence };
+    let mut ir = ClauseIr {
+        words,
+        pre: vec![],
+        parts: vec![],
+        fallback: false,
+        marker: String::new(),
+        merged: false,
+        punct,
+        ends_sentence,
+    };
     visit(g, tree, &mut ir);
     ir
+}
+
+/// 句式分析失败时的 IR：整个分句当成一个块，只能做词语级的处理。
+pub fn fallback(words: Vec<Word>, punct: String, ends_sentence: bool) -> ClauseIr {
+    let all: Vec<usize> = (0..words.len()).collect();
+    let verbs = all.iter().copied().filter(|&w| is_verb(words[w].cat)).collect();
+    let parts = if words.is_empty() {
+        vec![]
+    } else {
+        vec![Part {
+            role: Role::Action,
+            words: all,
+            markers: vec![],
+            verbs,
+            obj: vec![],
+            obj2: vec![],
+            template: None,
+            appended: vec![],
+            dead: false,
+        }]
+    };
+    ClauseIr { words, pre: vec![], parts, fallback: true, marker: String::new(), merged: false, punct, ends_sentence }
 }
 
 fn leaves(t: &Tree, out: &mut Vec<usize>) {

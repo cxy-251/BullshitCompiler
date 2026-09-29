@@ -64,8 +64,8 @@ pub struct Stats {
     pub chars_out: usize,
     pub words: usize,
     pub jargon_words: usize,
-    /// 句式分析失败的分句数。
-    pub failed: usize,
+    /// 句式没认出来、退回逐词处理的分句数。
+    pub fallback: usize,
 }
 
 impl Stats {
@@ -111,6 +111,13 @@ impl Compiler {
         Compiler::new(builtin_layers())
     }
 
+    /// 内置词典再加上若干层（本地词典文件夹里的批次、用户粘贴的一批新词条……）。
+    pub fn with_layers(extra: Vec<Layer>) -> Compiler {
+        let mut layers = builtin_layers();
+        layers.extend(extra.into_iter().filter(|l| !l.text.trim().is_empty()));
+        Compiler::new(layers)
+    }
+
     /// 内置词典再加上一层（比如用户粘贴的一批新词条）。
     pub fn with_extra(name: &str, text: &str) -> Compiler {
         let mut layers = builtin_layers();
@@ -148,22 +155,17 @@ impl Compiler {
                     }
                 }
             }
-            let ir = match &parse.tree {
+            let mut ir = match &parse.tree {
+                _ if words.is_empty() => ir::fallback(words, seg.punct.clone(), seg.ends_sentence),
                 Some(tree) => ir::lower_tree(g, tree, words, seg.punct.clone(), seg.ends_sentence),
                 None => {
-                    stats.failed += 1;
+                    stats.fallback += 1;
                     diags.push(self.parse_error(&seg, &syms, parse.fail_at.unwrap_or(0)));
-                    ClauseIr {
-                        words,
-                        pre: vec![],
-                        parts: vec![],
-                        failed: true,
-                        merged: false,
-                        punct: seg.punct.clone(),
-                        ends_sentence: seg.ends_sentence,
-                    }
+                    ir::fallback(words, seg.punct.clone(), seg.ends_sentence)
                 }
             };
+            ir.fallback &= !seg.tokens.is_empty();
+            ir.marker = seg.marker.clone();
             ir0.push(ir);
             clauses.push(ClauseResult { seg, syms, parse });
         }
@@ -209,12 +211,12 @@ impl Compiler {
                 (seg.tokens.last().map_or(Span::new(end, end), |t| t.span), "说到这里，句子还没说完")
             }
         };
-        Diagnostic::error("这个分句不在支持的句式范围内")
-            .with_code("E3101")
+        Diagnostic::warning("这个分句的句式没认出来，只做了词语级的处理")
+            .with_code("W3101")
             .with_primary(span, label)
             .with_note(format!("分词和类别：{}", words.join(" ")))
             .with_note(format!("支持的句式：{}", grammar::PATTERNS))
-            .with_help("这个分句原样保留（用【】标出）。可以换一种说法，或者在词典里补上没认出来的词")
+            .with_help("修饰语照样删、固定搭配照样换、黑话词照样降级，但不做句式改写和排比合并。在词典里补上没认出来的词，常常就能认出句式")
     }
 }
 
@@ -267,6 +269,13 @@ pub const PRESETS: &[(&str, &str)] = &[
     ),
     ("对齐颗粒度", "对齐颗粒度，拉通对齐，沉淀可复用的方法论。这个方案的底层逻辑是什么，抓手在哪里，颗粒度够不够细。"),
     ("排比与重复", "我们要提高质量和效率，提质增效。要以改革为引擎，激活发展新动能，补齐短板，夯实基础。"),
+    (
+        "一份通知",
+        "关于推进数字化转型工作的通知\n各部门：\n为深入贯彻落实公司战略部署，全面推进数字化转型，现就有关工作通知如下。\n\
+         一是提高政治站位。各部门要充分认识数字化转型的重要意义，切实增强责任感和紧迫感。\n\
+         二是强化统筹协调。要建立健全工作机制，形成上下联动、协同推进的工作格局。\n\
+         三是狠抓工作落实。要以钉钉子精神抓好各项任务，确保取得实效。",
+    ),
     ("句式之外", "和兄弟单位一起，共建共享。在新的历史起点上，我们要守正创新，勇毅前行。"),
     ("大白话", "昨天下雨了，我没带伞。"),
 ];
@@ -344,9 +353,8 @@ mod tests {
         for (name, text) in PRESETS {
             let r = c.compile(text);
             let plain: String = text.chars().filter(|c| !c.is_whitespace()).collect();
-            if r.stats.failed == 0 {
-                assert_eq!(r.unoptimized, plain, "{name}");
-            }
+            let unopt: String = r.unoptimized.chars().filter(|c| !c.is_whitespace()).collect();
+            assert_eq!(unopt, plain, "{name}");
             assert!(r.residual.is_empty(), "{name}: {:?}", r.residual);
             for cl in &r.clauses {
                 for t in cl.seg.tokens.iter().filter(|t| t.entry.is_none()) {
@@ -364,6 +372,7 @@ mod tests {
         {
             assert!(codes.contains(&code), "{code} 没有报出来：{codes:?}");
         }
-        assert!(ext.compile(PRESETS[6].1).output.contains("大胆往前走"));
+        let outside = PRESETS.iter().find(|(n, _)| *n == "句式之外").unwrap().1;
+        assert!(ext.compile(outside).output.contains("大胆往前走"));
     }
 }

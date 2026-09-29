@@ -43,8 +43,10 @@ pub struct Clause {
     /// 分句在输入里的字节位置（不含标点）。
     pub span: Span,
     pub text: String,
-    /// 后面跟的标点（没有就是空串）。
+    /// 后面跟的标点（没有就是空串；换行也算在里面，输出时照原样保留）。
     pub punct: String,
+    /// 行首的编号、项目符号（"一是""1.""（二）""•"），不参与分析，原样输出。
+    pub marker: String,
     /// 后面跟的标点结束了一整句。
     pub ends_sentence: bool,
     pub edges: Vec<Edge>,
@@ -62,7 +64,9 @@ pub fn split(input: &str, lex: &Lexicon) -> Vec<Clause> {
     let mut start = 0;
     let chars: Vec<(usize, char)> = input.char_indices().collect();
     for (k, &(i, c)) in chars.iter().enumerate() {
-        let end_sentence = SENTENCE_END.contains(&c);
+        // "1." "3.5" 里的点不是句号
+        let after_digit = k > 0 && chars[k - 1].1.is_ascii_digit();
+        let end_sentence = SENTENCE_END.contains(&c) && !(c == '.' && after_digit);
         if end_sentence || CLAUSE_END.contains(&c) {
             push_clause(&mut out, input, (start, i), c.to_string(), end_sentence, lex);
             start = i + c.len_utf8();
@@ -85,16 +89,56 @@ fn push_clause(
     let raw = &input[start..end];
     let trimmed = raw.trim();
     if trimmed.is_empty() {
-        if ends_sentence && let Some(last) = out.last_mut() {
-            last.ends_sentence = true;
-            if last.punct.is_empty() || !SENTENCE_END.iter().any(|c| last.punct.contains(*c)) {
-                last.punct = punct;
-            }
+        // 空分句：标点（多半是换行）接到上一个分句后面
+        if let Some(last) = out.last_mut() {
+            last.ends_sentence |= ends_sentence;
+            last.punct.push_str(&punct);
         }
         return;
     }
     let s = start + (raw.len() - raw.trim_start().len());
-    out.push(segment(input, Span::new(s, s + trimmed.len()), punct, ends_sentence, lex));
+    let m = list_marker(trimmed);
+    let body = trimmed[m..].trim_start();
+    let b = s + (trimmed.len() - body.len());
+    let mut clause = segment(input, Span::new(b, b + body.len()), punct, ends_sentence, lex);
+    clause.marker = trimmed[..m].trim_end().to_owned();
+    out.push(clause);
+}
+
+const NUMERALS: &str = "一二三四五六七八九十";
+
+/// 分句开头的编号或项目符号有多少字节（没有就是 0）。
+pub fn list_marker(text: &str) -> usize {
+    let chars: Vec<(usize, char)> = text.char_indices().collect();
+    let end_at = |k: usize| chars.get(k).map_or(text.len(), |&(i, _)| i);
+    let Some(&(_, first)) = chars.first() else { return 0 };
+    if "•·-*▶■●○◆▪◇□".contains(first) {
+        return end_at(1);
+    }
+    // （一） (1) （12）
+    if first == '（' || first == '(' {
+        if let Some(k) = chars.iter().take(6).position(|&(_, c)| c == '）' || c == ')')
+            && k > 1
+            && chars[1..k].iter().all(|&(_, c)| c.is_ascii_digit() || NUMERALS.contains(c))
+        {
+            return end_at(k + 1);
+        }
+        return 0;
+    }
+    // 1. 1、 12) 一、 二是 三要 第一 第二是
+    let skip = usize::from(first == '第');
+    let digits = chars[skip..].iter().take_while(|&&(_, c)| c.is_ascii_digit()).count();
+    let nums = chars[skip..].iter().take_while(|&&(_, c)| NUMERALS.contains(c)).count();
+    let k = skip + digits.max(nums);
+    if digits.max(nums) == 0 || digits.max(nums) > 3 {
+        return if ["首先", "其次", "再次", "最后"].contains(&text) { text.len() } else { 0 };
+    }
+    match chars.get(k).map(|&(_, c)| c) {
+        None if skip == 1 => text.len(),
+        Some('.' | '、' | '．' | ')' | '）') => end_at(k + 1),
+        Some('是' | '要') if nums > 0 => end_at(k + 1),
+        _ => 0,
+    }
 }
 
 /// 给一段文字分词（不分句）。
@@ -170,5 +214,5 @@ pub fn segment(input: &str, span: Span, punct: String, ends_sentence: bool, lex:
         }
     }
     flush(&mut run, &mut tokens);
-    Clause { span, text: text.to_owned(), punct, ends_sentence, edges, best: path, tokens }
+    Clause { span, text: text.to_owned(), punct, marker: String::new(), ends_sentence, edges, best: path, tokens }
 }

@@ -39,10 +39,7 @@ pub fn body_text(ir: &ClauseIr) -> String {
 }
 
 pub fn clause_text(ir: &ClauseIr) -> String {
-    if ir.failed {
-        return format!("【{}】", ir.words.iter().map(|w| w.text.as_str()).collect::<String>());
-    }
-    format!("{}{}", ir.text_of(&ir.pre), body_text(ir))
+    format!("{}{}{}", ir.marker, ir.text_of(&ir.pre), body_text(ir))
 }
 
 /// 整段输出。
@@ -51,18 +48,19 @@ pub fn render(irs: &[ClauseIr]) -> String {
     let mut pieces: Vec<(String, &str)> = Vec::new();
     let mut carry: Option<String> = None;
     for ir in irs {
-        if ir.failed {
-            pieces.push((clause_text(ir), &ir.punct));
-        } else if !ir.merged {
+        if !ir.merged {
             let pre = ir.text_of(&ir.pre);
-            if !ir.has_body() {
+            if ir.words.is_empty() {
+                // 只有编号的分句（"首先，"）
+                pieces.push((ir.marker.clone(), &ir.punct));
+            } else if !ir.has_body() {
                 if !pre.is_empty() && carry.is_none() {
                     carry = Some(pre);
                 }
             } else {
                 let pre = if pre.is_empty() { carry.take().unwrap_or_default() } else { pre };
                 carry = None;
-                pieces.push((format!("{pre}{}", body_text(ir)), &ir.punct));
+                pieces.push((format!("{}{pre}{}", ir.marker, body_text(ir)), &ir.punct));
             }
         }
         if ir.ends_sentence {
@@ -72,12 +70,8 @@ pub fn render(irs: &[ClauseIr]) -> String {
                 if i + 1 < n {
                     out.push_str(if punct.is_empty() { "，" } else { punct });
                 } else {
-                    out.push_str(match ir.punct.as_str() {
-                        "" => "。",
-                        "\n" => "。\n",
-                        p if [",", "，", ";", "；", ":", "："].contains(&p) => "。",
-                        p => p,
-                    });
+                    // 句末用这句最后一个分句的标点（它自己可能被删掉了），换行照原样保留
+                    out.push_str(&ir.punct);
                 }
             }
             carry = None;

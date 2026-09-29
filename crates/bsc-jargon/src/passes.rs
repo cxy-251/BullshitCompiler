@@ -98,7 +98,7 @@ fn edit_part(
 fn live_parts(irs: &[ClauseIr]) -> Vec<(usize, usize)> {
     let mut v = Vec::new();
     for (c, ir) in irs.iter().enumerate() {
-        if ir.failed || ir.merged {
+        if ir.merged {
             continue;
         }
         for (p, part) in ir.parts.iter().enumerate() {
@@ -141,10 +141,10 @@ fn fold(irs: &mut [ClauseIr], lex: &Lexicon, out: &mut Vec<Change>) {
 
 fn dce(irs: &mut [ClauseIr], out: &mut Vec<Change>) {
     for (c, p) in live_parts(irs) {
-        // 1. 虚动词 + 虚宾语：整块没有信息
+        // 1. 虚动词 + 虚宾语：整块没有信息（逐词处理的分句不知道结构，不做）
         edit_part(irs, c, p, out, |ir, p| {
             let part = &ir.parts[p];
-            if part.role != Role::Action {
+            if part.role != Role::Action || ir.fallback {
                 return None;
             }
             let verbs: Vec<usize> = part.verbs.iter().copied().filter(|&w| ir.alive(w)).collect();
@@ -206,7 +206,7 @@ fn dce(irs: &mut [ClauseIr], out: &mut Vec<Change>) {
     for (c, ir) in irs.iter_mut().enumerate() {
         let ws: Vec<usize> =
             ir.pre.iter().copied().filter(|&w| ir.alive(w) && ir.words[w].cat == Cat::Modifier).collect();
-        if ws.is_empty() || ir.failed {
+        if ws.is_empty() {
             continue;
         }
         let before = ir.text_of(&ir.pre);
@@ -311,7 +311,7 @@ fn lower(irs: &mut [ClauseIr], lex: &Lexicon, out: &mut Vec<Change>) {
 
 fn rewrite_pattern(ir: &mut ClauseIr, p: usize, lex: &Lexicon) -> Option<(Vec<usize>, String)> {
     let part = &ir.parts[p];
-    if part.template.is_some() {
+    if part.template.is_some() || ir.fallback {
         return None;
     }
     let chain_has = |w: usize, set: &[&str]| {
@@ -365,11 +365,13 @@ fn cse(irs: &mut [ClauseIr], out: &mut Vec<Change>) {
     for (c, p) in live_parts(irs) {
         edit_part(irs, c, p, out, |ir, p| {
             let verbs: Vec<usize> = ir.parts[p].verbs.iter().copied().filter(|&w| ir.alive(w)).collect();
-            if verbs.len() < 2 {
+            if verbs.len() < 2 || ir.fallback {
                 return None;
             }
             let (last, rest) = verbs.split_last().unwrap();
-            let ws: Vec<usize> = rest
+            // 三个以上、中心动词是朴素动词时（强化统筹协调），第一个动词是真正的谓语，留下它
+            let keep_first = rest.len() >= 2 && ir.words[*last].cat == Cat::Verb;
+            let ws: Vec<usize> = rest[usize::from(keep_first)..]
                 .iter()
                 .copied()
                 .filter(|&w| {
@@ -404,7 +406,7 @@ fn cse(irs: &mut [ClauseIr], out: &mut Vec<Change>) {
         let mut j = i;
         while !irs[j].ends_sentence && j + 1 < irs.len() {
             j += 1;
-            let empty = !irs[j].failed && !irs[j].has_body() && irs[j].text_of(&irs[j].pre).is_empty();
+            let empty = !irs[j].has_body() && irs[j].text_of(&irs[j].pre).is_empty();
             if !(irs[j].merged || empty) {
                 break;
             }
@@ -446,7 +448,7 @@ fn cse(irs: &mut [ClauseIr], out: &mut Vec<Change>) {
     // 3. 同一句里重复的分句（常见于固定搭配折叠以后："提高质量和效率，提质增效"）
     let mut seen: Vec<String> = Vec::new();
     for (c, ir) in irs.iter_mut().enumerate() {
-        if !ir.failed && ir.has_body() {
+        if ir.has_body() {
             let body = crate::emit::body_text(ir);
             if seen.contains(&body) && ir.text_of(&ir.pre).is_empty() {
                 let ws: Vec<usize> = (0..ir.words.len()).collect();
@@ -470,7 +472,7 @@ fn cse(irs: &mut [ClauseIr], out: &mut Vec<Change>) {
 
 /// 可以参与排比合并：恰好一个活着的"谓词 + 宾语"动作块，没有句式改写。
 fn mergeable(ir: &ClauseIr) -> bool {
-    if ir.failed || ir.merged {
+    if ir.fallback || ir.merged {
         return false;
     }
     let live: Vec<&Part> = ir.parts.iter().filter(|p| !p.dead).collect();
