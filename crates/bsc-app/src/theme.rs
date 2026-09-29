@@ -33,6 +33,31 @@ impl Palette {
         if ui.visuals().dark_mode { Self::DARK } else { Self::LIGHT }
     }
 
+    /// 分类用的填充色（比如最小化时给不同的组上色），亮暗两套各 8 种，循环使用。
+    pub fn category(&self, i: usize) -> Color32 {
+        const LIGHT: [Color32; 8] = [
+            Color32::from_rgb(0xd6, 0xe6, 0xfb),
+            Color32::from_rgb(0xfc, 0xe0, 0xc8),
+            Color32::from_rgb(0xd4, 0xf0, 0xd9),
+            Color32::from_rgb(0xf3, 0xd9, 0xf0),
+            Color32::from_rgb(0xfa, 0xf0, 0xbe),
+            Color32::from_rgb(0xcf, 0xee, 0xee),
+            Color32::from_rgb(0xe8, 0xdc, 0xf8),
+            Color32::from_rgb(0xf6, 0xd4, 0xd4),
+        ];
+        const DARK: [Color32; 8] = [
+            Color32::from_rgb(0x1f, 0x3a, 0x5c),
+            Color32::from_rgb(0x5a, 0x3a, 0x1e),
+            Color32::from_rgb(0x1f, 0x4a, 0x2c),
+            Color32::from_rgb(0x4d, 0x28, 0x4a),
+            Color32::from_rgb(0x4d, 0x45, 0x16),
+            Color32::from_rgb(0x1c, 0x47, 0x47),
+            Color32::from_rgb(0x3a, 0x2c, 0x5a),
+            Color32::from_rgb(0x55, 0x24, 0x24),
+        ];
+        if self.text.r() > 128 { DARK[i % 8] } else { LIGHT[i % 8] }
+    }
+
     pub fn token(&self, class: TokenClass) -> Color32 {
         match class {
             TokenClass::Number => self.number,

@@ -1,9 +1,11 @@
 //! 可复用的界面组件。
 
+mod graph_view;
 mod source_view;
 mod stepper;
 mod tree_view;
 
+pub use graph_view::{GEdge, GEdgeStyle, GNode, GNodeStyle, Graph, graph_view};
 pub use source_view::{Mark, source_view};
 pub use stepper::Stepper;
 pub use tree_view::{NodeStyle, TreeNode, scrollable_tree};

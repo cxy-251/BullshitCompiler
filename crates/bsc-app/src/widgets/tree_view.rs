@@ -1,6 +1,6 @@
 //! 树的绘制：语法树、调用树等都用它。
 //!
-//! 布局算法很朴素：叶子节点从左到右依次占一个"槽位"，父节点放在第一个和最后
+//! 布局算法很朴素：叶子节点按标签宽度从左到右依次排开，父节点放在第一个和最后
 //! 一个孩子的正中间，纵坐标由深度决定。节点可以是一片森林（语法分析进行到一半时，
 //! 已经建好的是若干棵小树），按顺序并排摆放。
 
@@ -32,24 +32,23 @@ impl NodeStyle {
     }
 }
 
-const SLOT_W: f32 = 52.0;
+const GAP: f32 = 14.0;
 const LEVEL_H: f32 = 62.0;
 const MARGIN: f32 = 16.0;
 
 /// 画一棵树（或森林），返回鼠标悬停的节点。
 pub fn tree_view(ui: &mut Ui, nodes: &[TreeNode], style: impl Fn(usize) -> NodeStyle) -> Option<usize> {
-    let layout = Layout::compute(nodes);
-    let size = Vec2::new(
-        (layout.slots as f32 * SLOT_W).max(SLOT_W) + 2.0 * MARGIN,
-        (layout.max_depth as f32 + 1.0) * LEVEL_H + MARGIN,
-    );
+    let p = Palette::of(ui);
+    // 先量出每个节点标签的宽度，布局时叶子按实际宽度依次排开。
+    let galleys: Vec<_> =
+        nodes.iter().map(|n| ui.painter().layout_no_wrap(n.label.clone(), mono(16.0), p.text)).collect();
+    let widths: Vec<f32> = galleys.iter().map(|g| (g.size().x + 18.0).max(34.0)).collect();
+    let layout = Layout::compute(nodes, &widths);
+    let size = Vec2::new(layout.width.max(40.0) + 2.0 * MARGIN, (layout.max_depth as f32 + 1.0) * LEVEL_H + MARGIN);
     let (response, painter) = ui.allocate_painter(size, Sense::hover());
     let origin = response.rect.min;
-    let center = |i: usize| {
-        origin + Vec2::new(MARGIN + (layout.x[i] + 0.5) * SLOT_W, MARGIN + 14.0 + layout.depth[i] as f32 * LEVEL_H)
-    };
+    let center = |i: usize| origin + Vec2::new(MARGIN + layout.x[i], MARGIN + 14.0 + layout.depth[i] as f32 * LEVEL_H);
 
-    let p = Palette::of(ui);
     let styles: Vec<NodeStyle> = (0..nodes.len()).map(&style).collect();
 
     for (i, n) in nodes.iter().enumerate() {
@@ -62,14 +61,12 @@ pub fn tree_view(ui: &mut Ui, nodes: &[TreeNode], style: impl Fn(usize) -> NodeS
 
     let hover_pos = response.hover_pos();
     let mut hovered = None;
-    for (i, n) in nodes.iter().enumerate() {
+    for (i, galley) in galleys.into_iter().enumerate() {
         let s = styles[i];
         if !s.visible {
             continue;
         }
-        let galley = painter.layout_no_wrap(n.label.clone(), mono(16.0), p.text);
-        let rect =
-            Rect::from_center_size(center(i), (galley.size() + Vec2::new(18.0, 10.0)).max(Vec2::new(34.0, 28.0)));
+        let rect = Rect::from_center_size(center(i), Vec2::new(widths[i], (galley.size().y + 10.0).max(28.0)));
         painter.rect_filled(rect, CornerRadius::same(8), s.fill);
         let stroke = if s.emphasized { Stroke::new(3.0, s.stroke) } else { Stroke::new(1.5, s.stroke) };
         painter.rect_stroke(rect, CornerRadius::same(8), stroke, StrokeKind::Inside);
@@ -82,37 +79,39 @@ pub fn tree_view(ui: &mut Ui, nodes: &[TreeNode], style: impl Fn(usize) -> NodeS
 }
 
 struct Layout {
+    /// 节点中心的横坐标（像素）。
     x: Vec<f32>,
     depth: Vec<usize>,
-    slots: usize,
+    width: f32,
     max_depth: usize,
 }
 
 impl Layout {
-    fn compute(nodes: &[TreeNode]) -> Self {
+    fn compute(nodes: &[TreeNode], widths: &[f32]) -> Self {
         let mut is_child = vec![false; nodes.len()];
         for n in nodes {
             for &c in &n.children {
                 is_child[c] = true;
             }
         }
-        let mut layout = Layout { x: vec![0.0; nodes.len()], depth: vec![0; nodes.len()], slots: 0, max_depth: 0 };
+        let mut layout = Layout { x: vec![0.0; nodes.len()], depth: vec![0; nodes.len()], width: 0.0, max_depth: 0 };
         for root in (0..nodes.len()).filter(|&i| !is_child[i]) {
-            layout.place(nodes, root, 0);
+            layout.place(nodes, widths, root, 0);
         }
+        layout.width = (layout.width - GAP).max(0.0);
         layout
     }
 
-    fn place(&mut self, nodes: &[TreeNode], i: usize, depth: usize) {
+    fn place(&mut self, nodes: &[TreeNode], widths: &[f32], i: usize, depth: usize) {
         self.depth[i] = depth;
         self.max_depth = self.max_depth.max(depth);
         let children = &nodes[i].children;
         if children.is_empty() {
-            self.x[i] = self.slots as f32;
-            self.slots += 1;
+            self.x[i] = self.width + widths[i] / 2.0;
+            self.width += widths[i] + GAP;
         } else {
             for &c in children {
-                self.place(nodes, c, depth + 1);
+                self.place(nodes, widths, c, depth + 1);
             }
             let first = self.x[children[0]];
             let last = self.x[*children.last().unwrap()];

@@ -1,6 +1,7 @@
 //! 「学习」页：课程目录 + 课程内容。
 
 mod ch0;
+mod ch1;
 
 use eframe::egui::{self, RichText, ScrollArea, Ui};
 
@@ -30,6 +31,10 @@ pub struct Chapter {
     pub lessons: &'static [LessonMeta],
 }
 
+const fn ready(id: &'static str, title: &'static str, level: Level) -> LessonMeta {
+    LessonMeta { id, title, level, ready: true, preview: "" }
+}
+
 const fn planned(id: &'static str, title: &'static str, level: Level, preview: &'static str) -> LessonMeta {
     LessonMeta { id, title, level, ready: false, preview }
 }
@@ -54,20 +59,11 @@ pub const COURSE: &[Chapter] = &[
                 Level::Basic,
                 "逐字符扫描、最长匹配、关键字与标识符的区分、记录源码位置。",
             ),
-            planned(
-                "1.2",
-                "正则表达式",
-                Level::Basic,
-                "用三种运算（连接、选择、重复）描述记号的形状；把正则画成语法树。",
-            ),
-            planned(
-                "1.3",
-                "NFA：非确定有限自动机",
-                Level::Basic,
-                "Thompson 构造法把任意正则变成 NFA；可视化状态图，输入字符串单步跑。",
-            ),
-            planned("1.4", "DFA 与子集构造", Level::Advanced, "ε-闭包、子集构造法逐步演示；为什么 DFA 跑得快。"),
-            planned("1.5", "DFA 最小化", Level::Advanced, "Hopcroft 划分细化算法逐步演示；等价状态的直观含义。"),
+            ready("1.2", "正则表达式", Level::Basic),
+            ready("1.3", "NFA：非确定有限自动机", Level::Basic),
+            ready("1.4", "DFA 与子集构造", Level::Advanced),
+            ready("1.5", "DFA 最小化", Level::Advanced),
+            ready("1.6", "从正则到词法分析器", Level::Basic),
         ],
     },
     Chapter {
@@ -126,11 +122,12 @@ pub const COURSE: &[Chapter] = &[
 pub struct LearnPage {
     pub current: String,
     ch0: ch0::Lesson,
+    ch1: ch1::Chapter,
 }
 
 impl Default for LearnPage {
     fn default() -> Self {
-        Self { current: "0.1".to_owned(), ch0: ch0::Lesson::default() }
+        Self { current: "0.1".to_owned(), ch0: ch0::Lesson::default(), ch1: ch1::Chapter::default() }
     }
 }
 
@@ -183,6 +180,11 @@ impl LearnPage {
         };
         match meta.id {
             "0.1" => self.ch0.ui(ui),
+            "1.2" => self.ch1.regex.ui(ui),
+            "1.3" => self.ch1.nfa.ui(ui),
+            "1.4" => self.ch1.dfa.ui(ui),
+            "1.5" => self.ch1.minimize.ui(ui),
+            "1.6" => self.ch1.lexgen.ui(ui),
             _ => planned_lesson(ui, meta),
         }
     }

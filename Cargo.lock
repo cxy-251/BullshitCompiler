@@ -213,6 +213,7 @@ dependencies = [
 name = "bsc-app"
 version = "0.1.0"
 dependencies = [
+ "bsc-automata",
  "bsc-calc",
  "bsc-core",
  "eframe",

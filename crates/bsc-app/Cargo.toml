@@ -11,6 +11,7 @@ default-run = "bsc-app"
 [dependencies]
 bsc-core = { path = "../bsc-core" }
 bsc-calc = { path = "../bsc-calc" }
+bsc-automata = { path = "../bsc-automata" }
 eframe = { version = "0.36", default-features = false, features = ["default_fonts", "glow", "persistence", "wayland", "x11"] }
 log = "0.4"
 serde = { version = "1", features = ["derive"] }

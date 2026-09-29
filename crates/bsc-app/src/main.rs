@@ -3,6 +3,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")] // Windows 发布版不弹控制台窗口
 
 mod app;
+mod automata_view;
 mod calc_view;
 mod fonts;
 mod pages;
