@@ -2,6 +2,7 @@
 
 mod ch0;
 mod ch1;
+mod ch2;
 
 use eframe::egui::{self, RichText, ScrollArea, Ui};
 
@@ -64,12 +65,12 @@ pub const COURSE: &[Chapter] = &[
     Chapter {
         title: "第 2 章 · 语法分析：理解句子结构",
         lessons: &[
-            planned("2.1", "文法与推导", Level::Basic, "上下文无关文法、推导、语法树；用文法生成句子。"),
-            planned("2.2", "歧义与优先级", Level::Basic, "同一句话两棵树；用文法层次和结合性消除歧义。"),
+            ready("2.1", "文法与推导", Level::Basic),
+            ready("2.2", "歧义与优先级", Level::Basic),
             planned("2.3", "递归下降", Level::Basic, "每条规则一个函数；调用栈的单步演示；错误恢复。"),
             planned("2.4", "Pratt 分析法", Level::Basic, "用\"绑定力\"处理任意多的运算符优先级。"),
-            planned("2.5", "LL(1) 分析表", Level::Advanced, "FIRST / FOLLOW 集的不动点计算，分析表的构造与冲突。"),
-            planned("2.6", "LR 分析", Level::Advanced, "项目集、LR(0) 自动机、SLR / LR(1) / LALR 的区别与冲突。"),
+            ready("2.5", "LL(1) 分析表", Level::Advanced),
+            ready("2.6", "LR 分析", Level::Advanced),
         ],
     },
     Chapter {
@@ -118,11 +119,17 @@ pub struct LearnPage {
     pub current: String,
     ch0: ch0::Lesson,
     ch1: ch1::Chapter,
+    ch2: ch2::Chapter,
 }
 
 impl Default for LearnPage {
     fn default() -> Self {
-        Self { current: "0.1".to_owned(), ch0: ch0::Lesson::default(), ch1: ch1::Chapter::default() }
+        Self {
+            current: "0.1".to_owned(),
+            ch0: ch0::Lesson::default(),
+            ch1: ch1::Chapter::default(),
+            ch2: ch2::Chapter::default(),
+        }
     }
 }
 
@@ -181,6 +188,10 @@ impl LearnPage {
             "1.4" => self.ch1.dfa.ui(ui),
             "1.5" => self.ch1.minimize.ui(ui),
             "1.6" => self.ch1.lexgen.ui(ui),
+            "2.1" => self.ch2.grammar.ui(ui),
+            "2.2" => self.ch2.ambiguity.ui(ui),
+            "2.5" => self.ch2.ll1.ui(ui),
+            "2.6" => self.ch2.lr.ui(ui),
             _ => planned_lesson(ui, meta),
         }
     }

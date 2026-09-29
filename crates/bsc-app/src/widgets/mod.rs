@@ -32,16 +32,25 @@ pub fn prose_sized(ui: &mut Ui, text: &str, size: f32) -> Response {
 pub fn prose_colored(ui: &mut Ui, text: &str, size: f32, color: Color32) -> Response {
     let p = Palette::of(ui);
     let mut job = LayoutJob::default();
+    let strong = ui.visuals().strong_text_color();
+    // `代码` 显示成等宽字体加底色；**强调** 显示成更醒目的颜色（代码里的 ** 不算）。
     for (i, part) in text.split('`').enumerate() {
         if part.is_empty() {
             continue;
         }
-        let format = if i % 2 == 1 {
-            TextFormat { font_id: mono(size * 0.95), color, background: p.code_bg, ..Default::default() }
-        } else {
-            TextFormat { font_id: FontId::proportional(size), color, ..Default::default() }
-        };
-        job.append(part, 0.0, format);
+        if i % 2 == 1 {
+            let format = TextFormat { font_id: mono(size * 0.95), color, background: p.code_bg, ..Default::default() };
+            job.append(part, 0.0, format);
+            continue;
+        }
+        for (j, piece) in part.split("**").enumerate() {
+            if piece.is_empty() {
+                continue;
+            }
+            let c = if j % 2 == 1 { strong } else { color };
+            let format = TextFormat { font_id: FontId::proportional(size), color: c, ..Default::default() };
+            job.append(piece, 0.0, format);
+        }
     }
     ui.label(job)
 }

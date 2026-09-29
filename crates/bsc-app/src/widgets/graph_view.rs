@@ -342,7 +342,8 @@ fn draw(
 
     // 边上的字最后画，带底色，保证压在线上也看得清。
     for (pos, text, s) in labels {
-        let color = if s.emphasized { s.color } else { p.text };
+        // 被淡化的边（颜色半透明），标签也跟着淡化
+        let color = if s.emphasized || s.color.a() < 200 { s.color } else { p.text };
         let galley = painter.layout_no_wrap(text, font.clone(), color);
         let rect = Rect::from_center_size(pos, galley.size() + Vec2::new(6.0, 2.0));
         painter.rect_filled(rect, CornerRadius::same(3), p.card_bg.gamma_multiply(0.92));

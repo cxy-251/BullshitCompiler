@@ -216,6 +216,7 @@ dependencies = [
  "bsc-automata",
  "bsc-calc",
  "bsc-core",
+ "bsc-grammar",
  "bsc-minilang",
  "eframe",
  "env_logger",

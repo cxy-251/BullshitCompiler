@@ -6,6 +6,7 @@ mod app;
 mod automata_view;
 mod calc_view;
 mod fonts;
+mod grammar_view;
 mod pages;
 mod theme;
 mod widgets;
