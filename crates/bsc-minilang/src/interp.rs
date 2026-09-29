@@ -124,7 +124,7 @@ impl Machine<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{cfg, dataflow, interp, ir, lexer, opt, parser, sccp, sema, ssa};
+    use crate::{bytecode, cfg, dataflow, interp, ir, lexer, opt, parser, regalloc, rv, sccp, sema, sim, ssa};
 
     /// 降级、转 SSA 前后，程序的运行结果都必须和预期一致；SSA 里每个变量只赋值一次。
     #[test]
@@ -179,6 +179,36 @@ mod tests {
             }
             let after: Vec<_> = ssas.into_iter().map(|s| s.after).collect();
             assert_eq!(interp::run(&after).as_deref(), Ok(*expect), "SSA：{src}");
+
+            // 栈式虚拟机
+            let bc = bytecode::run(&bytecode::compile(&p.ast, p.root, &a), 0);
+            assert_eq!((bc.output.as_slice(), bc.error), (*expect, None), "字节码：{src}");
+
+            // RISC-V：两种指令选择 × 两种寄存器分配 × 不同的寄存器个数（少的时候大量溢出）
+            for smart in [true, false] {
+                for k in [1, 2, 3, 11] {
+                    for scan in [true, false] {
+                        let asm: Vec<_> = cfgs
+                            .iter()
+                            .map(|c| {
+                                let (m, _) = rv::select(c, smart);
+                                let alloc = if scan {
+                                    regalloc::linear_scan(&m, k).alloc
+                                } else {
+                                    regalloc::color(&m, k).alloc
+                                };
+                                regalloc::finalize(&m, &alloc)
+                            })
+                            .collect();
+                        let r = sim::run(&asm, 0);
+                        assert_eq!(
+                            (r.output.as_slice(), r.error),
+                            (*expect, None),
+                            "RISC-V（smart={smart} k={k} 线性扫描={scan}）：{src}"
+                        );
+                    }
+                }
+            }
 
             // 优化前后行为不变
             let opt: Vec<_> = cfgs.iter().map(|c| opt::dce(&opt::fold(c).output).output).collect();
