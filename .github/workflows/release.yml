@@ -67,7 +67,7 @@ jobs:
         working-directory: crates/bsc-app
         env:
           APPIMAGE_EXTRACT_AND_RUN: "1" # CI 机器上没有 FUSE，AppImage 工具解压后运行
-        run: cargo packager --release --formats ${{ matrix.formats }} --out-dir ../../packages
+        run: cargo packager --release --formats ${{ matrix.formats }} --binaries-dir ../../target/release --out-dir ../../packages
       - name: 列出安装包
         shell: bash
         run: |
