@@ -32,7 +32,7 @@ crates/
   bsc-app    eframe/egui 图形界面，原生与 wasm 共用一份代码
     src/app.rs          顶栏 + 三个页面（学习 / 实验台 / 黑话编译器），状态持久化
     src/pages/learn/    课程目录（mod.rs 中的 COURSE）与各课内容（ch0.rs …）
-    src/pages/lab.rs    类 Godbolt 的多栏联动视图
+    src/pages/lab.rs    实验台：mini-lang 全流程浏览器（编辑器带语法着色；记号/语法树/语义/三地址码/控制流图/SSA/优化/RISC-V/运行 各阶段标签页，指向产物高亮源码，五种执行方式对照输出）
     src/pages/jargon.rs 黑话编译器页（目前是设计预览）
     src/calc_view.rs    计算器编译器各阶段的逐步回放视图
     src/automata_view.rs 第 1 章共用：正则流水线、自动机 → 状态图、正则输入框

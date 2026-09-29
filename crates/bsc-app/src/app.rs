@@ -33,7 +33,8 @@ impl Tab {
 struct Saved {
     tab: Tab,
     lesson: Option<String>,
-    lab_input: Option<String>,
+    /// 实验台里的 mini-lang 程序（旧版本存的是计算器算式，字段名不同，自动忽略）。
+    lab_program: Option<String>,
 }
 
 pub struct BscApp {
@@ -52,15 +53,18 @@ impl BscApp {
         if let Some(lesson) = saved.lesson {
             learn.current = lesson;
         }
-        let lab = saved.lab_input.map(LabPage::with_input).unwrap_or_default();
+        let lab = saved.lab_program.map(LabPage::with_input).unwrap_or_default();
         Self { tab: saved.tab, learn, lab }
     }
 }
 
 impl eframe::App for BscApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
-        let saved =
-            Saved { tab: self.tab, lesson: Some(self.learn.current.clone()), lab_input: Some(self.lab.input.clone()) };
+        let saved = Saved {
+            tab: self.tab,
+            lesson: Some(self.learn.current.clone()),
+            lab_program: Some(self.lab.input.clone()),
+        };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }
 
