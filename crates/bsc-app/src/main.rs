@@ -25,7 +25,7 @@ fn main() -> eframe::Result {
             .with_min_inner_size([480.0, 360.0]),
         ..Default::default()
     };
-    eframe::run_native(APP_TITLE, options, Box::new(|cc| Ok(Box::new(BscApp::new(cc)))))
+    eframe::run_native(APP_TITLE, options, Box::new(|cc| Ok(Box::new(BscApp::new(cc, fonts::bundled_cjk())))))
 }
 
 #[cfg(target_arch = "wasm32")]
@@ -42,8 +42,17 @@ fn main() {
             .dyn_into::<eframe::web_sys::HtmlCanvasElement>()
             .expect("bsc_canvas 不是 <canvas> 元素");
 
+        // 先下载中文字体（文件名固定，第二次打开起走浏览器缓存）。失败了也照常启动，只是中文显示成方框。
+        let cjk = match fetch_bytes(fonts::CJK_FONT_URL).await {
+            Ok(bytes) => Some(eframe::egui::FontData::from_owned(bytes)),
+            Err(e) => {
+                log::error!("下载中文字体失败: {e:?}");
+                None
+            }
+        };
+
         let result = eframe::WebRunner::new()
-            .start(canvas, eframe::WebOptions::default(), Box::new(|cc| Ok(Box::new(BscApp::new(cc)))))
+            .start(canvas, eframe::WebOptions::default(), Box::new(|cc| Ok(Box::new(BscApp::new(cc, cjk)))))
             .await;
 
         if let Some(loading) = document.get_element_by_id("loading") {
@@ -56,4 +65,19 @@ fn main() {
             }
         }
     });
+}
+
+/// 用浏览器的 fetch 下载一个文件。
+#[cfg(target_arch = "wasm32")]
+async fn fetch_bytes(url: &str) -> Result<Vec<u8>, eframe::wasm_bindgen::JsValue> {
+    use eframe::wasm_bindgen::JsCast as _;
+    use wasm_bindgen_futures::JsFuture;
+
+    let window = web_sys::window().ok_or("没有 window 对象")?;
+    let response: web_sys::Response = JsFuture::from(window.fetch_with_str(url)).await?.dyn_into()?;
+    if !response.ok() {
+        return Err(format!("HTTP {}", response.status()).into());
+    }
+    let buffer = JsFuture::from(response.array_buffer()?).await?;
+    Ok(js_sys::Uint8Array::new(&buffer).to_vec())
 }

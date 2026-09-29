@@ -8,6 +8,9 @@
 
     <!-- trunk 构建指令：编译本 crate 为 wasm，发布时用体积优先的 web-release 配置 -->
     <link data-trunk rel="rust" data-bin="bsc-app" data-cargo-profile="web-release" data-wasm-opt="z" />
+    <!-- 中文字体单独成一个文件、文件名固定：更新代码后浏览器仍可复用缓存的字体 -->
+    <link data-trunk rel="copy-file" href="assets/fonts/NotoSansSC-Subset.ttf" data-target-path="fonts" />
+    <link rel="preload" href="fonts/NotoSansSC-Subset.ttf" as="fetch" crossorigin="anonymous" />
 
     <style>
         html, body { margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden; background: #1b1d21; }
@@ -29,7 +32,7 @@
     <canvas id="bsc_canvas"></canvas>
     <div id="loading">
         <div class="spinner"></div>
-        <p>BSc 编译原理实验室 加载中…<br /><small>首次打开需要下载约 4 MB（含中文字体），之后会被浏览器缓存。</small></p>
+        <p>BSc 编译原理实验室 加载中…<br /><small>第一次打开需要下载约 3 MB（其中一半是中文字体）；之后字体会从浏览器缓存读取，更新版本时只需下载约 1 MB。</small></p>
     </div>
 </body>
 </html>

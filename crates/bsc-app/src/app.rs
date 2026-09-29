@@ -43,8 +43,8 @@ pub struct BscApp {
 }
 
 impl BscApp {
-    pub fn new(cc: &eframe::CreationContext<'_>) -> Self {
-        fonts::install(&cc.egui_ctx);
+    pub fn new(cc: &eframe::CreationContext<'_>, cjk_font: Option<eframe::egui::FontData>) -> Self {
+        fonts::install(&cc.egui_ctx, cjk_font);
         theme::install(&cc.egui_ctx);
 
         let saved: Saved = cc.storage.and_then(|s| eframe::get_value(s, eframe::APP_KEY)).unwrap_or_default();
@@ -86,7 +86,11 @@ impl BscApp {
                 ui.selectable_value(&mut self.tab, tab, RichText::new(tab.title()).size(16.0));
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                egui::widgets::global_theme_preference_switch(ui);
+                // 自己画切换按钮：egui 自带的切换按钮用的是太阳/月亮图标，我们没有打包那套图标字体。
+                let dark = ui.visuals().dark_mode;
+                if ui.button(if dark { "浅色" } else { "深色" }).on_hover_text("切换亮色/暗色主题").clicked() {
+                    ui.ctx().set_theme(if dark { egui::Theme::Light } else { egui::Theme::Dark });
+                }
                 ui.hyperlink_to("源码", "https://github.com/cxy-251/BullshitCompiler");
             });
         });
