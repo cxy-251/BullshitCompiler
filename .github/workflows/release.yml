@@ -56,12 +56,13 @@ jobs:
             formats: deb,appimage
           - os: windows-latest
             formats: wix,nsis
+            rustflags: -C target-feature=+crt-static
           - os: macos-latest
             formats: dmg,app
     runs-on: ${{ matrix.os }}
     env:
       # Windows：静态链接 C 运行库（别人的电脑上不用装 VC++ 运行库）
-      RUSTFLAGS: ${{ runner.os == 'Windows' && '-C target-feature=+crt-static' || '' }}
+      RUSTFLAGS: ${{ matrix.rustflags }}
       VER: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
