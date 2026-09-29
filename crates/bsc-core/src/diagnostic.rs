@@ -55,6 +55,14 @@ impl Diagnostic {
         }
     }
 
+    pub fn warning(message: impl Into<String>) -> Self {
+        Self { severity: Severity::Warning, ..Self::error(message) }
+    }
+
+    pub fn note(message: impl Into<String>) -> Self {
+        Self { severity: Severity::Note, ..Self::error(message) }
+    }
+
     pub fn with_code(mut self, code: &'static str) -> Self {
         self.code = Some(code);
         self

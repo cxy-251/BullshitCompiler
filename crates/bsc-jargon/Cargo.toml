@@ -1,0 +1,15 @@
+[package]
+name = "bsc-jargon"
+description = "黑话编译器：把故作高深的\"领导讲话\"编译成大白话。词典是可扩充的数据（带校验），编译走真正的流水线：Aho-Corasick 分词 + 词图、加权 Earley 句式分析、语义角色 IR、优化 Pass、朴素中文生成"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bsc-core = { path = "../bsc-core" }
+bsc-grammar = { path = "../bsc-grammar" }
+
+[lints]
+workspace = true
