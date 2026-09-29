@@ -68,7 +68,16 @@ cargo run -p bsc-app                                  # 原生桌面版
 cd crates/bsc-app && trunk serve                      # Web 版本地预览（http://127.0.0.1:8080）
 cd crates/bsc-app && trunk build --release --public-url ./   # Web 发布构建 → dist/
 ```
-CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查；`pages.yml` 在 main 分支上构建并发布到 GitHub Pages；`release.yml` 在打 `v*` 标签时构建 Linux/Windows/macOS 原生程序。
+CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查；`pages.yml` **只在版本号变化时**构建并发布到 GitHub Pages；`release.yml` 在打 `v*` 标签时构建 Linux/Windows/macOS 原生程序。
+推送前先在本地跑 `cargo fmt --all --check` 和 clippy，别让 CI 因为格式挂掉。
+
+## 版本号与发布（用户定的规则）
+版本号只有一处：根目录 `Cargo.toml` 的 `[workspace.package] version`（界面右上角显示 `v0.1.x`）。格式 `主.次.修订`，从 0.1.0 开始。
+- **平时提交不改版本号** → 只跑 CI，不部署 Pages。
+- **修订号（第三位）+1** → 触发 Pages 部署。一批改动做完、想让用户看效果时由 Claude 来改。
+- **次版本号（第二位）+1、修订号归零** → 阶段性进展，**由用户说了才改**。
+- 主版本号（第一位）暂不动。
+- `pages.yml` 比较推送前后的版本号，不同才构建部署；也可以在 Actions 页面手动运行。
 
 ## 黑话编译器设计要点（大白话方向为主）
 黑话高度公式化（词汇有限、句式固定、修饰语堆叠但不携带信息），所以把它当成一门有文法的"源语言"：

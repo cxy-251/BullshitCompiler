@@ -1,10 +1,14 @@
 # 构建 Web 版并发布到 GitHub Pages。
 # 首次使用前需要在仓库 Settings → Pages → Build and deployment → Source 选择 "GitHub Actions"。
+#
+# 只在版本号变化时发布：根目录 Cargo.toml 里 [workspace.package] 的 version 和推送前不一样才部署
+# （版本号规则见 CLAUDE.md）。平时的提交不改版本号，就不会部署。也可以在 Actions 页面手动运行。
 name: 发布 Web 版
 
 on:
   push:
     branches: [main]
+    paths: [Cargo.toml]
   workflow_dispatch:
 
 permissions:
@@ -20,7 +24,32 @@ env:
   TRUNK_VERSION: v0.21.14
 
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      changed: ${{ steps.cmp.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - id: cmp
+        name: 比较版本号
+        env:
+          BEFORE: ${{ github.event.before }}
+        run: |
+          ver() { grep -m1 '^version *=' | sed 's/.*"\(.*\)".*/\1/'; }
+          now=$(ver < Cargo.toml)
+          old=$(git show "$BEFORE:Cargo.toml" 2>/dev/null | ver || true)
+          echo "推送前 ${old:-无}，现在 $now"
+          if [ "$GITHUB_EVENT_NAME" = workflow_dispatch ] || [ "$old" != "$now" ]; then
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          fi
+
   build:
+    needs: version
+    if: needs.version.outputs.changed == 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

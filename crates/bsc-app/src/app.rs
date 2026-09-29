@@ -93,6 +93,7 @@ impl BscApp {
                     ui.ctx().set_theme(if dark { egui::Theme::Light } else { egui::Theme::Dark });
                 }
                 ui.hyperlink_to("源码", "https://github.com/cxy-251/BullshitCompiler");
+                ui.label(RichText::new(concat!("v", env!("CARGO_PKG_VERSION"))).small().color(p.muted));
             });
         });
         ui.add_space(2.0);
