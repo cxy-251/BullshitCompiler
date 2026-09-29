@@ -82,7 +82,7 @@ const LAYER_GAP: f32 = 96.0;
 const ROW_GAP: f32 = 72.0;
 const MARGIN: f32 = 44.0;
 /// 上下留白：要容得下自环和弯曲的回边。
-const V_MARGIN: f32 = 58.0;
+const V_MARGIN: f32 = 72.0;
 const MAX_BEND: f32 = 96.0;
 
 /// 布局结果：每个状态的坐标（以左上角为原点）和整张图的大小。
@@ -299,7 +299,41 @@ fn draw(
         } * d.length();
         // 弧线离弦的最大距离是 bend/2，限制在上下留白之内，避免画出界。
         let bend = bend.min(MAX_BEND * scale);
-        let ctrl = a + d / 2.0 + normal * bend;
+        // 弯向哪一边：默认按法向量；单向的弧线如果这样会擦过别的状态，就换到离状态更远的那一边
+        let clearance = |ctrl: Pos2| {
+            let mut best = f32::INFINITY;
+            for k in 1..16 {
+                let t = k as f32 / 16.0;
+                let p =
+                    a.to_vec2() * (1.0 - t) * (1.0 - t) + ctrl.to_vec2() * 2.0 * t * (1.0 - t) + b.to_vec2() * t * t;
+                for v in (0..g.nodes.len()).filter(|&v| v != *from && v != *to) {
+                    best = best.min((at(v).to_vec2() - p).length());
+                }
+                // 状态下方的注释也要躲开
+                for v in (0..g.nodes.len()).filter(|&v| g.nodes[v].note.is_some()) {
+                    best = best.min((at(v).to_vec2() + Vec2::new(0.0, r * 1.7) - p).length());
+                }
+            }
+            best
+        };
+        let mut ctrl = a + d / 2.0 + normal * bend;
+        if bend > 0.0 && !reverse_exists && clearance(ctrl) < r * 1.6 {
+            // 依次尝试：另一侧、再弯一点的这一侧和另一侧……取第一个躲得开的，都躲不开就取离得最远的
+            let mut best = (clearance(ctrl), ctrl);
+            'search: for mult in [1.0, 1.5, 2.0] {
+                for sign in [1.0, -1.0] {
+                    let c = a + d / 2.0 + normal * (bend * mult).min(MAX_BEND * 1.6 * scale) * sign;
+                    let cl = clearance(c);
+                    if cl > best.0 {
+                        best = (cl, c);
+                    }
+                    if cl >= r * 1.6 {
+                        break 'search;
+                    }
+                }
+            }
+            ctrl = best.1;
+        }
         let start = a + (ctrl - a).normalized() * r;
         let end = b + (ctrl - b).normalized() * r;
         if bend == 0.0 {

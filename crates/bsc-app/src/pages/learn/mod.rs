@@ -4,6 +4,7 @@ mod ch0;
 mod ch1;
 mod ch2;
 mod ch3;
+mod ch4;
 
 use eframe::egui::{self, RichText, ScrollArea, Ui};
 
@@ -85,10 +86,10 @@ pub const COURSE: &[Chapter] = &[
     Chapter {
         title: "第 4 章 · 中间表示：编译器的内部语言",
         lessons: &[
-            planned("4.1", "三地址码", Level::Basic, "把嵌套的表达式拍平成一条条简单指令。"),
-            planned("4.2", "基本块与控制流图", Level::Basic, "if / while 如何变成图；基本块的划分。"),
-            planned("4.3", "支配树", Level::Advanced, "支配关系的定义与迭代算法；支配边界。"),
-            planned("4.4", "SSA 形式", Level::Advanced, "φ 函数的插入与变量重命名，逐步演示 SSA 构造。"),
+            ready("4.1", "三地址码", Level::Basic),
+            ready("4.2", "基本块与控制流图", Level::Basic),
+            ready("4.3", "支配树", Level::Advanced),
+            ready("4.4", "SSA 形式", Level::Advanced),
         ],
     },
     Chapter {
@@ -122,6 +123,7 @@ pub struct LearnPage {
     ch1: ch1::Chapter,
     ch2: ch2::Chapter,
     ch3: ch3::Chapter,
+    ch4: ch4::Chapter,
 }
 
 impl Default for LearnPage {
@@ -132,6 +134,7 @@ impl Default for LearnPage {
             ch1: ch1::Chapter::default(),
             ch2: ch2::Chapter::default(),
             ch3: ch3::Chapter::default(),
+            ch4: ch4::Chapter::default(),
         }
     }
 }
@@ -200,6 +203,10 @@ impl LearnPage {
             "3.1" => self.ch3.scope.ui(ui),
             "3.2" => self.ch3.typeck.ui(ui),
             "3.3" => self.ch3.infer.ui(ui),
+            "4.1" => self.ch4.tac.ui(ui),
+            "4.2" => self.ch4.cfg.ui(ui),
+            "4.3" => self.ch4.dom.ui(ui),
+            "4.4" => self.ch4.ssa.ui(ui),
             _ => planned_lesson(ui, meta),
         }
     }
