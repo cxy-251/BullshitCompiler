@@ -1,0 +1,12 @@
+[package]
+name = "bsc-decompiler"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Decompiler for reverse stripping corporate jargon into brutal plain truth"
+
+[dependencies]
+bsc-core = { path = "../bsc-core" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

@@ -1,0 +1,11 @@
+[package]
+name = "bsc-core"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "Core data structures, AST, SSA-like Intent-IR, and source spans for Bullshit Compiler"
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

@@ -1,0 +1,20 @@
+[package]
+name = "bsc-wasm"
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+description = "WebAssembly bindings for running Bullshit Compiler natively in the browser"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+bsc-core = { path = "../bsc-core" }
+bsc-classic = { path = "../bsc-classic" }
+bsc-frontend = { path = "../bsc-frontend" }
+bsc-opt = { path = "../bsc-opt" }
+bsc-backend = { path = "../bsc-backend" }
+bsc-decompiler = { path = "../bsc-decompiler" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"

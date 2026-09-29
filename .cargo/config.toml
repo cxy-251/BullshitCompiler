@@ -1,0 +1,3 @@
+# Standard cargo configuration
+[build]
+# Default build options

@@ -1,0 +1,26 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/bsc-core",
+    "crates/bsc-classic",
+    "crates/bsc-frontend",
+    "crates/bsc-opt",
+    "crates/bsc-backend",
+    "crates/bsc-decompiler",
+    "crates/bsc-cli",
+    "crates/bsc-wasm",
+    "crates/bsc-tui",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+authors = ["Bullshit Compiler Contributors"]
+license = "MIT OR Apache-2.0"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = true
