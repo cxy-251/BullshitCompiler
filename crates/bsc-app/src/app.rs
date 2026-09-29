@@ -88,7 +88,8 @@ impl BscApp {
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 // 自己画切换按钮：egui 自带的切换按钮用的是太阳/月亮图标，我们没有打包那套图标字体。
                 let dark = ui.visuals().dark_mode;
-                if ui.button(if dark { "浅色" } else { "深色" }).on_hover_text("切换亮色/暗色主题").clicked() {
+                if ui.button(if dark { "浅色" } else { "深色" }).on_hover_text("切换亮色/暗色主题").clicked()
+                {
                     ui.ctx().set_theme(if dark { egui::Theme::Light } else { egui::Theme::Dark });
                 }
                 ui.hyperlink_to("源码", "https://github.com/cxy-251/BullshitCompiler");

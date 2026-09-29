@@ -245,6 +245,13 @@ name = "bsc-core"
 version = "0.1.0"
 
 [[package]]
+name = "bsc-grammar"
+version = "0.1.0"
+dependencies = [
+ "bsc-core",
+]
+
+[[package]]
 name = "bsc-minilang"
 version = "0.1.0"
 dependencies = [

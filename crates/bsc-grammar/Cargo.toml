@@ -1,0 +1,14 @@
+[package]
+name = "bsc-grammar"
+description = "上下文无关文法工具：文法解析、Earley 分析（所有语法树）、推导、FIRST/FOLLOW、LL(1)、LR(0)/SLR；每个算法都记录逐步过程"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bsc-core = { path = "../bsc-core" }
+
+[lints]
+workspace = true
