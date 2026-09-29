@@ -191,11 +191,45 @@ impl Cfg {
                 nb.kinds =
                     old.succs.iter().zip(&old.kinds).filter(|(s, _)| new_id(**s).is_some()).map(|(_, k)| *k).collect();
                 nb.preds = old.preds.iter().filter_map(|&p| new_id(p)).collect();
+                // φ 的参数按前驱块编号记录，也要跟着换号；来自被删掉的块的参数直接去掉
+                for inst in &mut nb.insts {
+                    if let Inst::Phi { args, .. } = inst {
+                        *args = args.iter().filter_map(|&(p, o)| new_id(p).map(|q| (q, o))).collect();
+                    }
+                }
                 nb
             })
             .collect::<Vec<_>>();
         let n = blocks.len();
         Cfg { func: self.func.clone(), blocks, reachable: vec![true; n], steps: vec![] }
+    }
+
+    /// 重新计算从入口能走到哪些块（改过边之后调用）。
+    pub fn recompute_reachable(&mut self) {
+        self.reachable = vec![false; self.blocks.len()];
+        let mut stack = vec![0];
+        while let Some(b) = stack.pop() {
+            if b < self.blocks.len() && !self.reachable[b] {
+                self.reachable[b] = true;
+                stack.extend(self.blocks[b].succs.iter().copied());
+            }
+        }
+    }
+
+    /// 删掉边 from → to，同时更新前驱表和 to 里 φ 的参数。
+    pub fn remove_edge(&mut self, from: usize, to: usize) {
+        let b = &mut self.blocks[from];
+        if let Some(i) = b.succs.iter().position(|&s| s == to) {
+            b.succs.remove(i);
+            b.kinds.remove(i);
+        }
+        let t = &mut self.blocks[to];
+        t.preds.retain(|&p| p != from);
+        for inst in &mut t.insts {
+            if let Inst::Phi { args, .. } = inst {
+                args.retain(|(p, _)| *p != from);
+            }
+        }
     }
 
     /// 每个块的后继（给支配树等图算法用）。

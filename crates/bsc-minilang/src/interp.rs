@@ -23,7 +23,8 @@ struct Machine<'a> {
     depth: usize,
 }
 
-fn binop(op: BinOp, a: i64, b: i64) -> Result<i64, String> {
+/// 二元运算的语义（常量折叠也用它，保证编译时算的和运行时一样）。
+pub fn binop(op: BinOp, a: i64, b: i64) -> Result<i64, String> {
     use BinOp::*;
     Ok(match op {
         Add => a.wrapping_add(b),
@@ -123,7 +124,7 @@ impl Machine<'_> {
 
 #[cfg(test)]
 mod tests {
-    use crate::{cfg, interp, ir, lexer, parser, sema, ssa};
+    use crate::{cfg, dataflow, interp, ir, lexer, opt, parser, sccp, sema, ssa};
 
     /// 降级、转 SSA 前后，程序的运行结果都必须和预期一致；SSA 里每个变量只赋值一次。
     #[test]
@@ -178,6 +179,42 @@ mod tests {
             }
             let after: Vec<_> = ssas.into_iter().map(|s| s.after).collect();
             assert_eq!(interp::run(&after).as_deref(), Ok(*expect), "SSA：{src}");
+
+            // 优化前后行为不变
+            let opt: Vec<_> = cfgs.iter().map(|c| opt::dce(&opt::fold(c).output).output).collect();
+            assert_eq!(interp::run(&opt).as_deref(), Ok(*expect), "折叠 + 死代码消除：{src}");
+            for conditional in [true, false] {
+                let sc: Vec<_> = after.iter().map(|c| sccp::sccp(c, conditional).output).collect();
+                assert_eq!(interp::run(&sc).as_deref(), Ok(*expect), "SCCP({conditional})：{src}");
+            }
+            // 工作表算法和逐轮迭代的结果一致
+            for c in &cfgs {
+                for p in [dataflow::liveness(c), dataflow::reaching_definitions(c).0] {
+                    let w = dataflow::solve(&c.succs(), &p);
+                    assert_eq!((w.inn, w.out), dataflow::solve_round_robin(&c.succs(), &p), "{src}");
+                }
+            }
         }
+    }
+
+    /// 经典例子：x 只在一个永远不会执行的分支里被改成 2。
+    /// 条件常量传播能证明 x 始终是 1；不追踪可执行边的常量传播做不到。
+    #[test]
+    fn sccp_sees_through_dead_branches() {
+        let src = "fn main() { print(f()); }\n\
+                   fn f() -> int { let mut x = 1; let mut i = 0; while i < 10 { if x != 1 { x = 2; } i = i + 1; } return x; }";
+        let toks = lexer::lex(src).tokens;
+        let p = parser::parse_program(src, &toks);
+        let a = sema::analyze(src, &p.ast, p.root);
+        let low = ir::lower(src, &p.ast, p.root, &a);
+        let f = ssa::build(&cfg::build(&low.funcs[1]).compact()).after;
+        let ret = |c: &cfg::Cfg| {
+            c.blocks.iter().flat_map(|b| &b.insts).find_map(|i| match i {
+                ir::Inst::Return(Some(o)) => Some(*o),
+                _ => None,
+            })
+        };
+        assert_eq!(ret(&sccp::sccp(&f, true).output), Some(ir::Operand::Const(1)));
+        assert!(matches!(ret(&sccp::sccp(&f, false).output), Some(ir::Operand::Var(_))));
     }
 }
