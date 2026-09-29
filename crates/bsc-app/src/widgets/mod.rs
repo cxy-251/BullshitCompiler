@@ -168,7 +168,7 @@ pub fn diagnostic_view(ui: &mut Ui, source: &str, d: &Diagnostic) {
             .collect();
         source_view(ui, source, &[], &marks, 17.0);
 
-        for l in &d.labels {
+        for l in d.labels.iter().filter(|l| !l.message.is_empty()) {
             let lc = line_col(source, l.span.start);
             let tag = if l.primary { "▲" } else { "△" };
             prose(ui, &format!("{tag} 第 {} 行第 {} 列：{}", lc.line, lc.col, l.message));

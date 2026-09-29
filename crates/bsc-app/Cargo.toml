@@ -16,6 +16,7 @@ bsc-minilang = { path = "../bsc-minilang" }
 bsc-grammar = { path = "../bsc-grammar" }
 bsc-types = { path = "../bsc-types" }
 bsc-runtime = { path = "../bsc-runtime" }
+bsc-jargon = { path = "../bsc-jargon" }
 eframe = { version = "0.36", default-features = false, features = ["glow", "persistence", "wayland", "x11"] }
 log = "0.4"
 serde = { version = "1", features = ["derive"] }

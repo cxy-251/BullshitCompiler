@@ -3,7 +3,7 @@
 use eframe::egui::{self, RichText, Ui};
 use serde::{Deserialize, Serialize};
 
-use crate::pages::{jargon, lab::LabPage, learn::LearnPage};
+use crate::pages::{jargon::JargonPage, lab::LabPage, learn::LearnPage};
 use crate::theme::Palette;
 use crate::{fonts, theme};
 
@@ -35,12 +35,16 @@ struct Saved {
     lesson: Option<String>,
     /// 实验台里的 mini-lang 程序（旧版本存的是计算器算式，字段名不同，自动忽略）。
     lab_program: Option<String>,
+    /// 黑话编译器的输入和用户粘贴的扩充词条。
+    jargon_input: Option<String>,
+    jargon_batch: Option<String>,
 }
 
 pub struct BscApp {
     tab: Tab,
     learn: LearnPage,
     lab: LabPage,
+    jargon: JargonPage,
 }
 
 impl BscApp {
@@ -54,7 +58,11 @@ impl BscApp {
             learn.current = lesson;
         }
         let lab = saved.lab_program.map(LabPage::with_input).unwrap_or_default();
-        Self { tab: saved.tab, learn, lab }
+        let jargon = match saved.jargon_input {
+            Some(input) => JargonPage::with_saved(input, saved.jargon_batch.unwrap_or_default()),
+            None => JargonPage::default(),
+        };
+        Self { tab: saved.tab, learn, lab, jargon }
     }
 }
 
@@ -64,6 +72,8 @@ impl eframe::App for BscApp {
             tab: self.tab,
             lesson: Some(self.learn.current.clone()),
             lab_program: Some(self.lab.input.clone()),
+            jargon_input: Some(self.jargon.input.clone()),
+            jargon_batch: Some(self.jargon.batch.clone()),
         };
         eframe::set_value(storage, eframe::APP_KEY, &saved);
     }
@@ -73,7 +83,7 @@ impl eframe::App for BscApp {
         match self.tab {
             Tab::Learn => self.learn.ui(ui),
             Tab::Lab => self.lab.ui(ui),
-            Tab::Jargon => jargon::ui(ui),
+            Tab::Jargon => self.jargon.ui(ui),
         }
     }
 }

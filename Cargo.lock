@@ -211,12 +211,13 @@ dependencies = [
 
 [[package]]
 name = "bsc-app"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "bsc-automata",
  "bsc-calc",
  "bsc-core",
  "bsc-grammar",
+ "bsc-jargon",
  "bsc-minilang",
  "bsc-runtime",
  "bsc-types",
@@ -231,32 +232,32 @@ dependencies = [
 
 [[package]]
 name = "bsc-automata"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "bsc-core",
 ]
 
 [[package]]
 name = "bsc-calc"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "bsc-core",
 ]
 
 [[package]]
 name = "bsc-core"
-version = "0.1.5"
+version = "0.1.6"
 
 [[package]]
 name = "bsc-grammar"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "bsc-core",
 ]
 
 [[package]]
 name = "bsc-jargon"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "bsc-core",
  "bsc-grammar",
@@ -264,21 +265,21 @@ dependencies = [
 
 [[package]]
 name = "bsc-minilang"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "bsc-core",
 ]
 
 [[package]]
 name = "bsc-runtime"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "bsc-core",
 ]
 
 [[package]]
 name = "bsc-types"
-version = "0.1.5"
+version = "0.1.6"
 dependencies = [
  "bsc-core",
 ]
