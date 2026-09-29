@@ -15,10 +15,16 @@
 //! }
 //! ```
 //!
-//! 目前完成的是词法分析（`lexer`）和语法分析（`parser`，语句用递归下降、表达式用 Pratt）；
-//! 语义分析、中间表示等随课程推进逐步加入。
+//! 编译流水线：词法分析（`lexer`）→ 语法分析（`parser`，语句用递归下降、表达式用 Pratt）→
+//! 语义分析（`sema`）→ 三地址码（`ir`）→ 控制流图（`cfg`）→ 支配树（`dom`）→ SSA（`ssa`）；
+//! `interp` 直接执行控制流图，用来验证各步变换不改变程序行为。优化、后端随课程推进逐步加入。
 
 pub mod ast;
+pub mod cfg;
+pub mod dom;
+pub mod interp;
+pub mod ir;
 pub mod lexer;
 pub mod parser;
 pub mod sema;
+pub mod ssa;

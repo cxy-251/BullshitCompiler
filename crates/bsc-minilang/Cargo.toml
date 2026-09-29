@@ -1,6 +1,6 @@
 [package]
 name = "bsc-minilang"
-description = "mini-lang：课程使用的教学语言（变量、函数、分支、循环）。目前实现了手写词法分析器"
+description = "mini-lang：课程使用的教学语言（变量、函数、分支、循环）：词法、语法、语义分析，三地址码、控制流图、支配树、SSA"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
