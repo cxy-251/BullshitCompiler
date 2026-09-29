@@ -2,6 +2,8 @@
 #   Windows：.msi 安装包 + 安装程序 .exe（NSIS）
 #   macOS：  .dmg（Apple 芯片）
 #   Linux：  .deb（Debian/Ubuntu）+ .AppImage（下载即用，Steam Deck 桌面模式推荐）
+#   另有各平台便携版（解压即用，不用安装），以及所有文件的 SHA256SUMS.txt。
+#   Windows 版静态链接 C 运行库，不需要另装 VC++ 运行库；字体都打包在程序里，装上就能用。
 # 安装包由 cargo-packager 生成，配置在 crates/bsc-app/Cargo.toml 的 [package.metadata.packager]。
 #
 # 版本号规则（见 CLAUDE.md）：次版本号（第二位）变化时才发布 Release；只改修订号（第三位）时不发布，只部署网页。
@@ -55,8 +57,12 @@ jobs:
           - os: windows-latest
             formats: wix,nsis
           - os: macos-latest
-            formats: dmg
+            formats: dmg,app
     runs-on: ${{ matrix.os }}
+    env:
+      # Windows：静态链接 C 运行库（别人的电脑上不用装 VC++ 运行库）
+      RUSTFLAGS: ${{ runner.os == 'Windows' && '-C target-feature=+crt-static' || '' }}
+      VER: ${{ needs.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
@@ -68,12 +74,17 @@ jobs:
         env:
           APPIMAGE_EXTRACT_AND_RUN: "1" # CI 机器上没有 FUSE，AppImage 工具解压后运行
         run: cargo packager --release --formats ${{ matrix.formats }} --binaries-dir ../../target/release --out-dir ../../packages
-      - name: 列出安装包
+      - name: 收集安装包，打便携版
         shell: bash
         run: |
           ls -la packages
           mkdir upload
           find packages -maxdepth 1 -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' -o -name '*.deb' -o -name '*.AppImage' \) -exec cp {} upload/ \;
+          case "$RUNNER_OS" in
+            Windows) 7z a "upload/BSc-Compiler-Lab_${VER}_windows_x64_portable.zip" ./target/release/bsc-app.exe ;;
+            macOS)   ditto -c -k --keepParent packages/*.app "upload/BSc-Compiler-Lab_${VER}_macos_arm64_portable.zip" ;;
+            Linux)   tar -czf "upload/BSc-Compiler-Lab_${VER}_linux_x64_portable.tar.gz" -C target/release bsc-app ;;
+          esac
           ls -la upload
           test -n "$(ls upload)"
       - uses: actions/upload-artifact@v4
@@ -89,6 +100,8 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      - name: 生成 SHA256 校验和
+        run: cd dist && sha256sum * > SHA256SUMS.txt && cat SHA256SUMS.txt
       - name: 删掉同一版本旧的附件（重新发布时）
         env:
           GH_TOKEN: ${{ github.token }}
@@ -112,6 +125,10 @@ jobs:
             | macOS（Apple 芯片） | `.dmg` | 打开后把应用拖进"应用程序"。第一次打开要在"系统设置 → 隐私与安全性"里点"仍要打开"（没有苹果签名） |
             | Linux / Steam Deck | `.AppImage` | 下载后右键 → 属性 → 允许作为程序执行，双击运行；也可以 `chmod +x` 后直接运行 |
             | Debian / Ubuntu | `.deb` | `sudo apt install ./文件名.deb` |
+            | 便携版（各平台） | `…_portable.zip` / `.tar.gz` | 不用安装：解压后直接运行 `bsc-app`（macOS 是解压出的应用） |
+
+            所有程序都自带字体和运行所需的一切，不需要另装任何环境。
+            校验下载是否完整：对照 `SHA256SUMS.txt`（Linux/macOS 用 `sha256sum -c SHA256SUMS.txt --ignore-missing`，Windows 用 `certutil -hashfile 文件名 SHA256`）。
 
             不想安装也可以直接用 Web 版（见仓库的 GitHub Pages）。
           files: dist/*

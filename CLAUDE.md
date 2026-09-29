@@ -92,7 +92,9 @@ CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查；`p
 - **次版本号（第二位）+1、修订号归零** → 阶段性进展，**由用户说了才改**；除了部署 Pages，还会发布 GitHub Release（三个平台的原生程序）。
 - 主版本号（第一位）暂不动。
 - Release 的附件必须是**各平台原生安装包**（用户明确要求，不要只发压缩包）：Windows `.msi` + NSIS 安装程序 `.exe`、macOS `.dmg`、
-  Linux `.AppImage` + `.deb`。由 cargo-packager 生成（配置在 `crates/bsc-app/Cargo.toml` 的 `[package.metadata.packager]`）。
+  Linux `.AppImage` + `.deb`；另附各平台**便携版**（解压即用）和 `SHA256SUMS.txt`。不附更新日志（用户不想公开提交信息）。
+  目标是"装上就能用，不用另装环境"：Windows 静态链接 C 运行库（crt-static），字体打包在程序里。
+  安装包由 cargo-packager 生成（配置在 `crates/bsc-app/Cargo.toml` 的 `[package.metadata.packager]`）。
 - `pages.yml` 比较推送前后的版本号，不同才构建部署；也可以在 Actions 页面手动运行。
 
 ## 黑话编译器设计要点（大白话方向为主）
