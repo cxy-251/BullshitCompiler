@@ -1,0 +1,14 @@
+[package]
+name = "bsc-types"
+description = "Hindley–Milner 类型推导：一门迷你 ML 语言的解析与类型推导（合一、实例化、泛化），记录逐步过程"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bsc-core = { path = "../bsc-core" }
+
+[lints]
+workspace = true
