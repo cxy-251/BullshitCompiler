@@ -8,6 +8,17 @@ license.workspace = true
 repository.workspace = true
 default-run = "bsc-app"
 
+# 安装包（cargo-packager）：Windows 的 .msi 和安装程序 .exe、macOS 的 .dmg、Linux 的 .deb 和 .AppImage。
+# 由 .github/workflows/release.yml 调用，本地一般用不到。
+[package.metadata.packager]
+before-packaging-command = "cargo build --release -p bsc-app"
+product-name = "BSc Compiler Lab"
+identifier = "io.github.cxy251.bsc"
+publisher = "cxy-251"
+category = "Education"
+description = "BSc 编译原理实验室：交互式编译原理课程 + 黑话编译器"
+icons = ["assets/icon.png"]
+
 [dependencies]
 bsc-core = { path = "../bsc-core" }
 bsc-calc = { path = "../bsc-calc" }

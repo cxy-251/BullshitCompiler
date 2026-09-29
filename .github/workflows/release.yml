@@ -1,8 +1,11 @@
-# 发布原生版：为 Linux / Windows / macOS 构建程序，建立 GitHub Release（标签 v主.次.修订）并附上安装包。
+# 发布原生版：为 Windows / macOS / Linux 生成安装包，建立 GitHub Release（标签 v主.次.修订）并附上。
+#   Windows：.msi 安装包 + 安装程序 .exe（NSIS）
+#   macOS：  .dmg（Apple 芯片）
+#   Linux：  .deb（Debian/Ubuntu）+ .AppImage（下载即用，Steam Deck 桌面模式推荐）
+# 安装包由 cargo-packager 生成，配置在 crates/bsc-app/Cargo.toml 的 [package.metadata.packager]。
 #
 # 版本号规则（见 CLAUDE.md）：次版本号（第二位）变化时才发布 Release；只改修订号（第三位）时不发布，只部署网页。
-# 也可以在 Actions 页面手动运行，按当前版本号发布。
-# Linux 版在 ubuntu-22.04 上构建，glibc 版本较低，能在 SteamOS 等较新的发行版上直接运行。
+# 也可以在 Actions 页面手动运行，按当前版本号发布（同一个版本重新发布会替换掉旧的安装包）。
 name: 发布原生版
 
 on:
@@ -47,33 +50,36 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - os: ubuntu-22.04
-            target: x86_64-unknown-linux-gnu
-            archive: bsc-app-linux-x86_64.tar.gz
+          - os: ubuntu-22.04 # glibc 较低，SteamOS 等较新的发行版都能运行
+            formats: deb,appimage
           - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            archive: bsc-app-windows-x86_64.zip
+            formats: wix,nsis
           - os: macos-latest
-            target: aarch64-apple-darwin
-            archive: bsc-app-macos-arm64.tar.gz
+            formats: dmg
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.target }}
       - uses: Swatinem/rust-cache@v2
-      - run: cargo build --release -p bsc-app --target ${{ matrix.target }}
-      - name: 打包 (Unix)
-        if: runner.os != 'Windows'
-        run: tar -czf ${{ matrix.archive }} -C target/${{ matrix.target }}/release bsc-app
-      - name: 打包 (Windows)
-        if: runner.os == 'Windows'
-        run: Compress-Archive -Path target/${{ matrix.target }}/release/bsc-app.exe -DestinationPath ${{ matrix.archive }}
+      - name: 安装 cargo-packager
+        run: cargo install cargo-packager --locked
+      - name: 生成安装包
+        working-directory: crates/bsc-app
+        env:
+          APPIMAGE_EXTRACT_AND_RUN: "1" # CI 机器上没有 FUSE，AppImage 工具解压后运行
+        run: cargo packager --release --formats ${{ matrix.formats }} --out-dir ../../packages
+      - name: 列出安装包
+        shell: bash
+        run: |
+          ls -la packages
+          mkdir upload
+          find packages -maxdepth 1 -type f \( -name '*.msi' -o -name '*.exe' -o -name '*.dmg' -o -name '*.deb' -o -name '*.AppImage' \) -exec cp {} upload/ \;
+          ls -la upload
+          test -n "$(ls upload)"
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.archive }}
-          path: ${{ matrix.archive }}
+          name: packages-${{ matrix.os }}
+          path: upload/*
 
   release:
     needs: [version, build]
@@ -83,17 +89,29 @@ jobs:
         with:
           path: dist
           merge-multiple: true
+      - name: 删掉同一版本旧的附件（重新发布时）
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: v${{ needs.version.outputs.version }}
+        run: |
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release view "$TAG" --repo "$GITHUB_REPOSITORY" --json assets -q '.assets[].name' |
+              while read -r a; do gh release delete-asset "$TAG" "$a" --repo "$GITHUB_REPOSITORY" -y; done
+          fi
       - uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ needs.version.outputs.version }}
           name: v${{ needs.version.outputs.version }}
           target_commitish: ${{ github.sha }}
           body: |
-            BSc 编译原理实验室 v${{ needs.version.outputs.version }}
+            BSc 编译原理实验室 v${{ needs.version.outputs.version }}：交互式编译原理课程 + 黑话编译器。
 
-            - Linux（x86_64，Steam Deck 桌面模式可用）：bsc-app-linux-x86_64.tar.gz，解压后运行 `./bsc-app`
-            - Windows（x86_64）：bsc-app-windows-x86_64.zip，解压后运行 `bsc-app.exe`
-            - macOS（Apple 芯片）：bsc-app-macos-arm64.tar.gz，解压后运行 `./bsc-app`（首次打开可能要在"隐私与安全性"里允许）
+            | 系统 | 下载 | 用法 |
+            |---|---|---|
+            | Windows | `.msi` 或 `…-setup.exe` | 双击安装，开始菜单里打开。Windows 可能提示"未知发布者"，点"更多信息 → 仍要运行" |
+            | macOS（Apple 芯片） | `.dmg` | 打开后把应用拖进"应用程序"。第一次打开要在"系统设置 → 隐私与安全性"里点"仍要打开"（没有苹果签名） |
+            | Linux / Steam Deck | `.AppImage` | 下载后右键 → 属性 → 允许作为程序执行，双击运行；也可以 `chmod +x` 后直接运行 |
+            | Debian / Ubuntu | `.deb` | `sudo apt install ./文件名.deb` |
 
-            Web 版：见仓库的 GitHub Pages。
+            不想安装也可以直接用 Web 版（见仓库的 GitHub Pages）。
           files: dist/*
