@@ -82,14 +82,14 @@ cargo run -p bsc-app                                  # 原生桌面版
 cd crates/bsc-app && trunk serve                      # Web 版本地预览（http://127.0.0.1:8080）
 cd crates/bsc-app && trunk build --release --public-url ./   # Web 发布构建 → dist/
 ```
-CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查；`pages.yml` **只在版本号变化时**构建并发布到 GitHub Pages；`release.yml` 在打 `v*` 标签时构建 Linux/Windows/macOS 原生程序。
+CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查；`pages.yml` **只在版本号变化时**构建并发布到 GitHub Pages；`release.yml` 在**次版本号变化**时构建 Linux/Windows/macOS 原生程序并建立 GitHub Release（标签 `v主.次.修订`，自动创建）。
 推送前先在本地跑 `cargo fmt --all --check` 和 clippy，别让 CI 因为格式挂掉。
 
 ## 版本号与发布（用户定的规则）
 版本号只有一处：根目录 `Cargo.toml` 的 `[workspace.package] version`（界面右上角显示 `v0.1.x`）。格式 `主.次.修订`，从 0.1.0 开始。
 - **平时提交不改版本号** → 只跑 CI，不部署 Pages。
 - **修订号（第三位）+1** → 触发 Pages 部署。一批改动做完、想让用户看效果时由 Claude 来改。
-- **次版本号（第二位）+1、修订号归零** → 阶段性进展，**由用户说了才改**。
+- **次版本号（第二位）+1、修订号归零** → 阶段性进展，**由用户说了才改**；除了部署 Pages，还会发布 GitHub Release（三个平台的原生程序）。
 - 主版本号（第一位）暂不动。
 - `pages.yml` 比较推送前后的版本号，不同才构建部署；也可以在 Actions 页面手动运行。
 
@@ -126,7 +126,7 @@ CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查；`p
 - [x] M6 第 6 章后端：6.1 栈式虚拟机、6.2 指令选择、6.3 寄存器分配、6.4 调用约定；第 7 章运行时：7.1 引用计数、7.2 标记-清除、7.3 三色标记与写屏障（课程第 0–7 章全部完成）
 - [x] M7 黑话编译器 v1：分层可扩充词典（带校验）、AC 分词 + 词图、加权 Earley 句式分析、语义角色 IR、四个优化 Pass、生成与自检、黑话编译器页
 - [x] 0.2.0 阶段收尾：逐词处理兜底、真实文档格式（分段/编号/标题）、拖入 txt、复制/保存译文、本地词典文件夹
-- [ ] 之后：扩充词典与句式覆盖面、反向编译（大白话 → 黑话）、跨平台正式发布（推 v 标签触发 release.yml）
+- [ ] 之后：扩充词典与句式覆盖面、反向编译（大白话 → 黑话）
 
 ## 协作约定
 - 用户已授权技术决策由 Claude 决定；大的方向变化仍先和用户沟通。
