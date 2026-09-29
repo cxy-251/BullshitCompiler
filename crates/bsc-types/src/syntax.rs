@@ -176,7 +176,9 @@ fn lex(src: &str) -> Result<Vec<(Tok, Span)>, Diagnostic> {
                 return Err(Diagnostic::error(format!("不认识的字符 `{c}`"))
                     .with_code("E1301")
                     .with_primary(Span::new(start, start + c.len_utf8()), "")
-                    .with_note("这门小语言只有：数字、true、false、名字、fun -> let = in if then else + - * < == ( )"));
+                    .with_note(
+                        "这门小语言只有：数字、true、false、名字、fun -> let = in if then else + - * < == ( )",
+                    ));
             }
         };
         i += len;

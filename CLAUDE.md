@@ -23,7 +23,8 @@ crates/
   bsc-calc   计算器语言：最小完整编译器（lexer → 递归下降 parser → AST → 栈机代码生成 → VM），第 0 课和实验台用
   bsc-automata 正则 → NFA（Thompson）→ DFA（子集构造）→ 最小化（Moore 划分细化）→ 多规则词法分析器生成（最长匹配 + 优先级），全部带逐步记录；第 1 章用
   bsc-grammar  上下文无关文法工具：文法文本解析、Earley（任意 CFG，给出全部语法树）、最左推导、随机造句、FIRST/FOLLOW、LL(1)、LR(0)/SLR；第 2 章用。Earley 以后也给黑话编译器用
-  bsc-minilang 教学语言 mini-lang：手写词法分析器（1.1 课）+ 语法分析器（语句递归下降、表达式 Pratt、恐慌模式与插入式错误恢复；2.3/2.4 课）。AST 是统一的节点数组（NodeKind + children），语义/IR 随课程加入
+  bsc-minilang 教学语言 mini-lang：手写词法分析器（1.1 课）+ 语法分析器（语句递归下降、表达式 Pratt、恐慌模式与插入式错误恢复；2.3/2.4 课）+ 语义分析 sema.rs（作用域链、符号表、名字解析、类型检查，Error 类型防连锁报错；3.1/3.2 课）。AST 是统一的节点数组（NodeKind + children），IR 随课程加入
+  bsc-types    迷你 ML（不写类型的函数式小语言）+ Hindley–Milner 类型推导（合一、occurs check、实例化、let 泛化，全程事件记录）；3.3 课用
   bsc-app    eframe/egui 图形界面，原生与 wasm 共用一份代码
     src/app.rs          顶栏 + 三个页面（学习 / 实验台 / 黑话编译器），状态持久化
     src/pages/learn/    课程目录（mod.rs 中的 COURSE）与各课内容（ch0.rs …）
@@ -33,6 +34,7 @@ crates/
     src/automata_view.rs 第 1 章共用：正则流水线、自动机 → 状态图、正则输入框
     src/pages/learn/ch1/ 第 1 章各课（scanner/regex/nfa/dfa/minimize/lexgen）
     src/pages/learn/ch2/ 第 2 章各课（grammar/ambiguity/rd/pratt/ll1/lr；replay.rs 回放 mini-lang 分析事件）
+    src/pages/learn/ch3/ 第 3 章各课（scope/typeck/infer；mod.rs 里的 Front 跑一遍 mini-lang 前端）
     src/grammar_view.rs 第 2 章共用：文法编辑器、句子切分、产生式列表
     src/widgets/        通用组件：Stepper 播放器、源码高亮、树布局、状态图（graph_view：分层布局、自环、回边弧线）、
                         栈、测验、诊断展示、chip 小卡片、prose（反引号 → 行内代码）
@@ -40,7 +42,7 @@ crates/
     assets/fonts/       裁剪后的思源黑体 + JetBrains Mono（OFL，裁剪方法见其 README）
     index.html          trunk 的入口页
 ```
-计划新增：`bsc-jargon`（黑话编译器）；`bsc-minilang` 逐步补上语义分析、CFG/SSA、优化、后端。
+计划新增：`bsc-jargon`（黑话编译器）；`bsc-minilang` 逐步补上三地址码、CFG/SSA、优化、后端。
 
 ## 技术选型（已定）
 - 界面：**egui / eframe 0.36**（glow 后端）。注意 0.36 的 API：`App::ui(&mut self, ui, frame)`；面板用 `egui::Panel::left/top(..).show(ui, ..)`、`CentralPanel::default().show(ui, ..)`（`show_inside` 已弃用）。
@@ -83,7 +85,7 @@ CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查；`p
 - [x] M0 骨架：workspace、eframe 应用（原生 + Web）、中文字体、CI/Pages/Release 工作流、计算器编译器 + 第 0 课 + 实验台 + 黑话编译器设计页
 - [x] M1 第 1 章词法：1.1 手写扫描器（mini-lang 词法分析器）、1.2 正则、1.3 NFA/Thompson、1.4 DFA/子集构造、1.5 最小化、1.6 词法分析器生成；状态图组件
 - [x] M2 第 2 章语法：2.1 文法与推导、2.2 歧义与优先级、2.3 递归下降、2.4 Pratt、2.5 LL(1)、2.6 LR；mini-lang 语法分析器
-- [ ] M3 第 3 章语义：作用域、符号表、类型检查
+- [x] M3 第 3 章语义：3.1 作用域与符号表、3.2 类型检查、3.3 类型推导（HM）
 - [ ] M4–M5 中间表示与优化：三地址码、CFG、支配树、SSA、数据流框架、各优化 Pass
 - [ ] M6 起：黑话编译器 v1；第 6 章后端（字节码 VM、RISC-V 汇编 + 内置模拟器、寄存器分配）
 

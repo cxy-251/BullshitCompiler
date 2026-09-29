@@ -3,6 +3,7 @@
 mod ch0;
 mod ch1;
 mod ch2;
+mod ch3;
 
 use eframe::egui::{self, RichText, ScrollArea, Ui};
 
@@ -76,9 +77,9 @@ pub const COURSE: &[Chapter] = &[
     Chapter {
         title: "第 3 章 · 语义分析：检查意思对不对",
         lessons: &[
-            planned("3.1", "作用域与符号表", Level::Basic, "变量在哪里定义、在哪里可见；遮蔽；符号表的层次结构。"),
-            planned("3.2", "类型检查", Level::Basic, "类型规则、类型错误的诊断信息。"),
-            planned("3.3", "类型推导", Level::Advanced, "合一算法与 Hindley-Milner 类型推导 (Algorithm W)。"),
+            ready("3.1", "作用域与符号表", Level::Basic),
+            ready("3.2", "类型检查", Level::Basic),
+            ready("3.3", "类型推导", Level::Advanced),
         ],
     },
     Chapter {
@@ -120,6 +121,7 @@ pub struct LearnPage {
     ch0: ch0::Lesson,
     ch1: ch1::Chapter,
     ch2: ch2::Chapter,
+    ch3: ch3::Chapter,
 }
 
 impl Default for LearnPage {
@@ -129,6 +131,7 @@ impl Default for LearnPage {
             ch0: ch0::Lesson::default(),
             ch1: ch1::Chapter::default(),
             ch2: ch2::Chapter::default(),
+            ch3: ch3::Chapter::default(),
         }
     }
 }
@@ -194,6 +197,9 @@ impl LearnPage {
             "2.4" => self.ch2.pratt.ui(ui),
             "2.5" => self.ch2.ll1.ui(ui),
             "2.6" => self.ch2.lr.ui(ui),
+            "3.1" => self.ch3.scope.ui(ui),
+            "3.2" => self.ch3.typeck.ui(ui),
+            "3.3" => self.ch3.infer.ui(ui),
             _ => planned_lesson(ui, meta),
         }
     }

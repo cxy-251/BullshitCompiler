@@ -218,6 +218,7 @@ dependencies = [
  "bsc-core",
  "bsc-grammar",
  "bsc-minilang",
+ "bsc-types",
  "eframe",
  "env_logger",
  "js-sys",

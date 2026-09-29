@@ -32,7 +32,8 @@ pub enum Ty {
     Fun(Box<Ty>, Box<Ty>),
 }
 
-const GREEK: &[&str] = &["α", "β", "γ", "δ", "ζ", "η", "θ", "ι", "κ", "λ", "μ", "ν", "ξ", "π", "ρ", "σ", "τ", "φ", "χ", "ψ", "ω"];
+const GREEK: &[&str] =
+    &["α", "β", "γ", "δ", "ζ", "η", "θ", "ι", "κ", "λ", "μ", "ν", "ξ", "π", "ρ", "σ", "τ", "φ", "χ", "ψ", "ω"];
 
 /// 类型变量的名字：0 号是 α，1 号是 β……用完了就写成 t21、t22。
 pub fn var_name(v: u32) -> String {
@@ -223,15 +224,19 @@ impl W<'_> {
         self.unify_inner(a, b).map_err(|fail| {
             let span = self.prog.expr(node).span;
             match fail {
-                Fail::Mismatch(x, y) => Diagnostic::error(format!("类型不匹配：{} 和 {} 合不到一起", x.show(), y.show()))
-                    .with_code("E1304")
-                    .with_primary(span, format!("这里要求 {} = {}", la.show(), lb.show()))
-                    .with_note(why),
-                Fail::Occurs(v, t) => Diagnostic::error(format!("无限类型：{} 不能等于包含它自己的 {}", var_name(v), t.show()))
-                    .with_code("E1305")
-                    .with_primary(span, format!("这里要求 {} = {}", la.show(), lb.show()))
-                    .with_note(why)
-                    .with_help("典型的例子是 `x x`：x 要同时是函数和这个函数自己的参数，这样的类型写不出来"),
+                Fail::Mismatch(x, y) => {
+                    Diagnostic::error(format!("类型不匹配：{} 和 {} 合不到一起", x.show(), y.show()))
+                        .with_code("E1304")
+                        .with_primary(span, format!("这里要求 {} = {}", la.show(), lb.show()))
+                        .with_note(why)
+                }
+                Fail::Occurs(v, t) => {
+                    Diagnostic::error(format!("无限类型：{} 不能等于包含它自己的 {}", var_name(v), t.show()))
+                        .with_code("E1305")
+                        .with_primary(span, format!("这里要求 {} = {}", la.show(), lb.show()))
+                        .with_note(why)
+                        .with_help("典型的例子是 `x x`：x 要同时是函数和这个函数自己的参数，这样的类型写不出来")
+                }
             }
         })
     }
@@ -279,7 +284,9 @@ impl W<'_> {
                 Ty::Bool
             }
             ExprKind::Var(x) => {
-                self.events.push(Event::Visit { node: e, rule: "名字：到环境里查它的类型模式，把 ∀ 的变量换成新变量" });
+                self.events.push(Event::Visit {
+                    node: e, rule: "名字：到环境里查它的类型模式，把 ∀ 的变量换成新变量"
+                });
                 let Some((_, scheme)) = env.iter().rev().find(|(n, _)| *n == x).cloned() else {
                     return Err(Diagnostic::error(format!("找不到名字 `{x}`"))
                         .with_code("E1303")
@@ -296,7 +303,10 @@ impl W<'_> {
                 ty
             }
             ExprKind::Fun { param, body } => {
-                self.events.push(Event::Visit { node: e, rule: "函数：参数类型先用新变量代替，推出函数体的类型，整体是 参数 → 函数体" });
+                self.events.push(Event::Visit {
+                    node: e,
+                    rule: "函数：参数类型先用新变量代替，推出函数体的类型，整体是 参数 → 函数体",
+                });
                 let a = self.fresh(e, format!("参数 {param} 的类型还不知道，先用一个新变量代替"));
                 env.push((param, Scheme { vars: vec![], ty: a.clone() }));
                 let tb = self.infer(env, body);
@@ -304,7 +314,9 @@ impl W<'_> {
                 Ty::fun(a, tb?)
             }
             ExprKind::App { func, arg } => {
-                self.events.push(Event::Visit { node: e, rule: "调用：被调用的必须是函数，它的参数类型等于实参类型" });
+                self.events.push(Event::Visit {
+                    node: e, rule: "调用：被调用的必须是函数，它的参数类型等于实参类型"
+                });
                 let tf = self.infer(env, func)?;
                 let ta = self.infer(env, arg)?;
                 let r = self.fresh(e, "调用结果的类型还不知道，先用一个新变量代替".to_owned());
@@ -317,7 +329,10 @@ impl W<'_> {
                 r
             }
             ExprKind::Let { name, value, body } => {
-                self.events.push(Event::Visit { node: e, rule: "let：先推出值的类型并泛化，再在它的作用域里推导后面的表达式" });
+                self.events.push(Event::Visit {
+                    node: e,
+                    rule: "let：先推出值的类型并泛化，再在它的作用域里推导后面的表达式",
+                });
                 let tv = self.infer(env, value)?;
                 let tv = apply(&self.subst, &tv);
                 let fixed = self.env_vars(env);
@@ -332,7 +347,9 @@ impl W<'_> {
                 tb?
             }
             ExprKind::If { cond, then, els } => {
-                self.events.push(Event::Visit { node: e, rule: "if：条件必须是 bool，两个分支的类型必须相同" });
+                self.events.push(Event::Visit {
+                    node: e, rule: "if：条件必须是 bool，两个分支的类型必须相同"
+                });
                 let tc = self.infer(env, cond)?;
                 self.unify(cond, &tc, &Ty::Bool, "if 的条件必须是 bool".to_owned())?;
                 let tt = self.infer(env, then)?;
