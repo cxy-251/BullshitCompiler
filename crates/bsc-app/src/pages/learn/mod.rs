@@ -1,0 +1,207 @@
+//! 「学习」页：课程目录 + 课程内容。
+
+mod ch0;
+
+use eframe::egui::{self, RichText, ScrollArea, Ui};
+
+use crate::theme::Palette;
+use crate::widgets::{card, tag};
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub enum Level {
+    /// 面向零基础。
+    Basic,
+    /// 教材级的深入内容，建立在入门内容之上。
+    Advanced,
+}
+
+pub struct LessonMeta {
+    pub id: &'static str,
+    pub title: &'static str,
+    pub level: Level,
+    /// 是否已经上线。
+    pub ready: bool,
+    /// 这一课会讲什么（规划中的课程显示这段话）。
+    pub preview: &'static str,
+}
+
+pub struct Chapter {
+    pub title: &'static str,
+    pub lessons: &'static [LessonMeta],
+}
+
+const fn planned(id: &'static str, title: &'static str, level: Level, preview: &'static str) -> LessonMeta {
+    LessonMeta { id, title, level, ready: false, preview }
+}
+
+pub const COURSE: &[Chapter] = &[
+    Chapter {
+        title: "第 0 章 · 开篇",
+        lessons: &[LessonMeta {
+            id: "0.1",
+            title: "编译器是什么",
+            level: Level::Basic,
+            ready: true,
+            preview: "用一个完整的计算器编译器，走一遍词法分析、语法分析、代码生成、执行。",
+        }],
+    },
+    Chapter {
+        title: "第 1 章 · 词法分析：让机器认字",
+        lessons: &[
+            planned(
+                "1.1",
+                "手写一个扫描器",
+                Level::Basic,
+                "逐字符扫描、最长匹配、关键字与标识符的区分、记录源码位置。",
+            ),
+            planned(
+                "1.2",
+                "正则表达式",
+                Level::Basic,
+                "用三种运算（连接、选择、重复）描述记号的形状；把正则画成语法树。",
+            ),
+            planned(
+                "1.3",
+                "NFA：非确定有限自动机",
+                Level::Basic,
+                "Thompson 构造法把任意正则变成 NFA；可视化状态图，输入字符串单步跑。",
+            ),
+            planned("1.4", "DFA 与子集构造", Level::Advanced, "ε-闭包、子集构造法逐步演示；为什么 DFA 跑得快。"),
+            planned("1.5", "DFA 最小化", Level::Advanced, "Hopcroft 划分细化算法逐步演示；等价状态的直观含义。"),
+        ],
+    },
+    Chapter {
+        title: "第 2 章 · 语法分析：理解句子结构",
+        lessons: &[
+            planned("2.1", "文法与推导", Level::Basic, "上下文无关文法、推导、语法树；用文法生成句子。"),
+            planned("2.2", "歧义与优先级", Level::Basic, "同一句话两棵树；用文法层次和结合性消除歧义。"),
+            planned("2.3", "递归下降", Level::Basic, "每条规则一个函数；调用栈的单步演示；错误恢复。"),
+            planned("2.4", "Pratt 分析法", Level::Basic, "用\"绑定力\"处理任意多的运算符优先级。"),
+            planned("2.5", "LL(1) 分析表", Level::Advanced, "FIRST / FOLLOW 集的不动点计算，分析表的构造与冲突。"),
+            planned("2.6", "LR 分析", Level::Advanced, "项目集、LR(0) 自动机、SLR / LR(1) / LALR 的区别与冲突。"),
+        ],
+    },
+    Chapter {
+        title: "第 3 章 · 语义分析：检查意思对不对",
+        lessons: &[
+            planned("3.1", "作用域与符号表", Level::Basic, "变量在哪里定义、在哪里可见；遮蔽；符号表的层次结构。"),
+            planned("3.2", "类型检查", Level::Basic, "类型规则、类型错误的诊断信息。"),
+            planned("3.3", "类型推导", Level::Advanced, "合一算法与 Hindley-Milner 类型推导 (Algorithm W)。"),
+        ],
+    },
+    Chapter {
+        title: "第 4 章 · 中间表示：编译器的内部语言",
+        lessons: &[
+            planned("4.1", "三地址码", Level::Basic, "把嵌套的表达式拍平成一条条简单指令。"),
+            planned("4.2", "基本块与控制流图", Level::Basic, "if / while 如何变成图；基本块的划分。"),
+            planned("4.3", "支配树", Level::Advanced, "支配关系的定义与迭代算法；支配边界。"),
+            planned("4.4", "SSA 形式", Level::Advanced, "φ 函数的插入与变量重命名，逐步演示 SSA 构造。"),
+        ],
+    },
+    Chapter {
+        title: "第 5 章 · 优化：让程序更快更小",
+        lessons: &[
+            planned("5.1", "常量折叠与代数化简", Level::Basic, "编译期能算出来的就不留到运行时。"),
+            planned("5.2", "数据流分析", Level::Basic, "活跃变量、到达定值；worklist 算法单步演示。"),
+            planned("5.3", "死代码消除", Level::Basic, "没人用的计算可以删掉——但要小心副作用。"),
+            planned("5.4", "格与不动点", Level::Advanced, "数据流分析的数学基础：半格、单调函数、不动点定理。"),
+            planned("5.5", "稀疏条件常量传播", Level::Advanced, "SCCP 算法在 SSA 上的逐步演示。"),
+        ],
+    },
+    Chapter {
+        title: "第 6 章 · 后端：生成机器指令",
+        lessons: &[
+            planned("6.1", "栈式虚拟机", Level::Basic, "字节码的设计与解释执行；和 JVM、WebAssembly 的对照。"),
+            planned("6.2", "指令选择", Level::Advanced, "树模式匹配：把中间表示覆盖成目标机器指令。"),
+            planned("6.3", "寄存器分配", Level::Advanced, "活跃区间、线性扫描、干涉图着色的动画演示。"),
+            planned("6.4", "函数调用约定", Level::Advanced, "栈帧、参数传递、调用者/被调用者保存寄存器。"),
+        ],
+    },
+    Chapter {
+        title: "第 7 章 · 运行时（选修）",
+        lessons: &[planned("7.1", "垃圾回收", Level::Advanced, "引用计数、标记-清除、三色标记与写屏障。")],
+    },
+];
+
+pub struct LearnPage {
+    pub current: String,
+    ch0: ch0::Lesson,
+}
+
+impl Default for LearnPage {
+    fn default() -> Self {
+        Self { current: "0.1".to_owned(), ch0: ch0::Lesson::default() }
+    }
+}
+
+impl LearnPage {
+    pub fn ui(&mut self, ui: &mut Ui) {
+        let wide = ui.available_width() > 900.0;
+        if wide {
+            egui::Panel::left("course_catalog").default_size(250.0).size_range(200.0..=360.0).show(ui, |ui| {
+                ScrollArea::vertical().show(ui, |ui| self.catalog(ui));
+            });
+        }
+        egui::CentralPanel::default().show(ui, |ui| {
+            ScrollArea::vertical().id_salt("lesson_scroll").show(ui, |ui| {
+                if !wide {
+                    egui::CollapsingHeader::new("课程目录").show(ui, |ui| self.catalog(ui));
+                    ui.separator();
+                }
+                ui.set_max_width(ui.available_width().min(980.0));
+                self.lesson(ui);
+            });
+        });
+    }
+
+    fn catalog(&mut self, ui: &mut Ui) {
+        let p = Palette::of(ui);
+        for ch in COURSE {
+            ui.add_space(6.0);
+            ui.label(RichText::new(ch.title).strong());
+            for l in ch.lessons {
+                ui.horizontal(|ui| {
+                    let mut text = RichText::new(format!("{}  {}", l.id, l.title));
+                    if !l.ready {
+                        text = text.color(p.muted);
+                    }
+                    if ui.selectable_label(self.current == l.id, text).clicked() {
+                        self.current = l.id.to_owned();
+                    }
+                    if l.level == Level::Advanced {
+                        tag(ui, "进阶", p.paren);
+                    }
+                });
+            }
+        }
+    }
+
+    fn lesson(&mut self, ui: &mut Ui) {
+        let Some(meta) = COURSE.iter().flat_map(|c| c.lessons).find(|l| l.id == self.current) else {
+            self.current = "0.1".to_owned();
+            return;
+        };
+        match meta.id {
+            "0.1" => self.ch0.ui(ui),
+            _ => planned_lesson(ui, meta),
+        }
+    }
+}
+
+fn planned_lesson(ui: &mut Ui, meta: &LessonMeta) {
+    let p = Palette::of(ui);
+    ui.heading(format!("{}  {}", meta.id, meta.title));
+    ui.horizontal(|ui| {
+        tag(ui, "规划中", p.muted);
+        if meta.level == Level::Advanced {
+            tag(ui, "进阶", p.paren);
+        } else {
+            tag(ui, "入门", p.ok);
+        }
+    });
+    card(ui, |ui| {
+        ui.label(RichText::new("这一课会讲：").strong());
+        ui.label(meta.preview);
+    });
+    ui.label(RichText::new("每一课的演示都会由真实运行的编译器代码驱动，不是预先录好的动画。").color(p.muted));
+}

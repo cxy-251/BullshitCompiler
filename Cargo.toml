@@ -1,26 +1,28 @@
 [workspace]
-resolver = "2"
-members = [
-    "crates/bsc-core",
-    "crates/bsc-classic",
-    "crates/bsc-frontend",
-    "crates/bsc-opt",
-    "crates/bsc-backend",
-    "crates/bsc-decompiler",
-    "crates/bsc-cli",
-    "crates/bsc-wasm",
-    "crates/bsc-tui",
-]
+resolver = "3"
+members = ["crates/*"]
 
 [workspace.package]
 version = "0.1.0"
-edition = "2021"
-authors = ["Bullshit Compiler Contributors"]
+edition = "2024"
+rust-version = "1.95"
 license = "MIT OR Apache-2.0"
+repository = "https://github.com/cxy-251/BullshitCompiler"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+
+[workspace.lints.clippy]
+all = { level = "warn", priority = -1 }
 
 [profile.release]
+opt-level = 2
+lto = "thin"
+
+# Web 构建体积优先
+[profile.web-release]
+inherits = "release"
 opt-level = "z"
 lto = true
 codegen-units = 1
 panic = "abort"
-strip = true

@@ -1,11 +1,13 @@
 [package]
 name = "bsc-core"
+description = "BSc 公共基础设施：源码位置 (Span) 与诊断信息 (Diagnostic)"
 version.workspace = true
 edition.workspace = true
-authors.workspace = true
+rust-version.workspace = true
 license.workspace = true
-description = "Core data structures, AST, SSA-like Intent-IR, and source spans for Bullshit Compiler"
+repository.workspace = true
 
 [dependencies]
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
+
+[lints]
+workspace = true

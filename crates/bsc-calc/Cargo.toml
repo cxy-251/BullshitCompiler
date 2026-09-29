@@ -1,0 +1,14 @@
+[package]
+name = "bsc-calc"
+description = "计算器语言：一个最小但完整的编译器（词法 → 语法 → 代码生成 → 栈式虚拟机），用于第 0 课"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+repository.workspace = true
+
+[dependencies]
+bsc-core = { path = "../bsc-core" }
+
+[lints]
+workspace = true

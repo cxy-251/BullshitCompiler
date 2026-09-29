@@ -1,38 +1,77 @@
-# Bullshit Compiler System (BSc)
+# BSc 编译原理实验室 / 黑话编译器
 
-## 背景
-本项目由另一个 AI agent 起步，用户认为**当前实现很粗糙，完全没达到预期**，现交由 Claude 接手重做/提升。
-完整的原始需求演进过程见 `docs/001–012`（按序号递进，后面的覆盖前面的，012 最新）；下面是要点摘要。动手做大改动前，先和用户确认方向与优先级。
+## 这个项目是什么
+一个用 Rust 写的**跨平台图形应用**（原生桌面 + Web/GitHub Pages），有两个目标：
 
-## 产品目标
-1. **黑话编译器（核心卖点）**：用真正的编译器流水线（而不是关键词字典替换）把"大白话"编译成"大厂黑话"。
-   - 前端：词法 → 递归下降语法分析 → AST → 语言无关的语义中间表示 **Intent-IR（SSA 形式）**
-   - 中端：PassManager + 优化 Pass（如 StripAgency 去主体化、ScaleAmplify 规模膨胀、TeleologyInject 目的论注入）
-   - 后端：多目标"指令选择/发射"（huawei / alibaba / state_owned / silicon_valley 等风格）
-   - **反编译器（"照妖镜"）**：黑话 → 大白话
-2. **经典编译器（bsc-classic）**：一门微型命令式语言的完整流水线 Lexer → Parser → 语义/类型 → 3AC/IR → 优化 → x86 codegen / 字节码 VM，用于教学对照。示例见 `examples/*.lang`。
-3. **编译原理教学实验室**：面向非专业者的交互式科普（词法、AST、SSA、优化 Pass 等），用户要求理论深度达到教材级（龙书/虎书/EaC/TAPL 水准：DFA 最小化、LL/LR、HM 类型推导、支配树与 SSA 构造、数据流分析、寄存器分配、GC 等），不要浅表占位内容。
-4. **Web 展示**：类似 Godbolt 的 Compiler Explorer 分屏联动（源码 / IR / 输出三栏高亮联动、Pass 前后 Diff 回放），浏览器内通过 WASM 运行 Rust 内核。
+1. **编译原理学习（打基础，面向新手）**：知识点做成**可交互的界面**（单步演示、可视化、小测验），不写成长篇文档。由浅入深：每课先讲"入门"层（比喻 + 演示），再给"进阶"层（教材级的形式化内容，如 DFA 最小化、LL/LR、SSA、数据流分析、寄存器分配）。
+2. **黑话编译器（主要产品，要有深度）**：把故作高深的"领导讲话"编译成平凡质朴的大白话。必须走真正的编译流水线，不是查字典替换。
 
-## 硬性要求
-- 语言：**Rust**（Cargo workspace），Web 端经 WASM 调用同一内核。
-- 定位：工业级工程质量，架构对标 LLVM / rustc，拒绝脚本式拼凑的玩具。
-- 跨平台：WASM + 原生 CLI（`bsc`）+ 原生 TUI（`crates/bsc-tui`）。
-- 用户本机是 Steam Deck（SteamOS，只读根文件系统，可能无系统 cc）。
+用户是编译原理新手；界面和讲解**只用中文**。用户本机是 Steam Deck（SteamOS，可能没有系统 `cc`），所以原生版靠 CI 构建、Web 版部署到 GitHub Pages。
+
+历史：最初由另一个 AI 写了一版（粗糙、名不副实），已**完全推翻重写**。旧代码和 `docs/001–012` 已删除，不要参考。
+
+## 核心设计原则
+- **演示即实现**：界面上的每个演示都由真实运行的编译器代码驱动。算法运行时记录下每一步（事件/快照），界面只负责回放。**绝不在界面里另写一套模拟**，也不能写"看起来在跑其实是写死"的内容。尚未实现的东西必须明确标注"规划中/设计示意"。
+- **每个阶段的产物都是明确的数据结构**，带源码位置（`Span`），方便界面联动高亮（点指令 → 高亮源码）。
+- 错误用结构化的 `bsc_core::Diagnostic`（消息 + 标注 + 注释 + 帮助），不用字符串；既能渲染成 rustc 风格文本，也能在界面上画。错误信息面向新手，给出具体改法。
+- 每个编译器 crate 都要有充分测试（单元测试 + 端到端 + 差分/随机测试）。
 
 ## 仓库结构
-- `crates/bsc-core` AST / Intent-IR / Span / 类型
-- `crates/bsc-frontend` 黑话编译器前端（lexer, parser, ir_builder）
-- `crates/bsc-opt` Pass 管理与各 Pass
-- `crates/bsc-backend` 各风格发射器
-- `crates/bsc-decompiler` 反编译器
-- `crates/bsc-classic` 经典编译器全流程
-- `crates/bsc-cli` / `bsc-tui` / `bsc-wasm` 各入口
-- `web/index.html` + `web/bsc_wasm.wasm` 单页 Web 前端（Tailwind CDN）
+```
+crates/
+  bsc-core   公共基础：Span、行列换算、Diagnostic 及其终端渲染
+  bsc-calc   计算器语言：最小完整编译器（lexer → 递归下降 parser → AST → 栈机代码生成 → VM），第 0 课和实验台用
+  bsc-app    eframe/egui 图形界面，原生与 wasm 共用一份代码
+    src/app.rs          顶栏 + 三个页面（学习 / 实验台 / 黑话编译器），状态持久化
+    src/pages/learn/    课程目录（mod.rs 中的 COURSE）与各课内容（ch0.rs …）
+    src/pages/lab.rs    类 Godbolt 的多栏联动视图
+    src/pages/jargon.rs 黑话编译器页（目前是设计预览）
+    src/calc_view.rs    计算器编译器各阶段的逐步回放视图
+    src/widgets/        通用组件：Stepper 播放器、源码高亮、树布局绘制、栈、测验、诊断展示、prose（反引号 → 行内代码）
+    src/theme.rs        语义化配色（亮/暗两套），界面里只用 Palette 的字段，不直接写颜色
+    assets/fonts/       裁剪后的思源黑体 + JetBrains Mono（OFL，裁剪方法见其 README）
+    index.html          trunk 的入口页
+```
+计划新增：`bsc-automata`（正则/NFA/DFA/最小化）、`bsc-grammar`（FIRST/FOLLOW、LL(1)、LR）、`bsc-minilang`（带变量/函数/循环的教学语言，含 CFG/SSA/优化/后端）、`bsc-jargon`（黑话编译器）。
+
+## 技术选型（已定）
+- 界面：**egui / eframe 0.36**（glow 后端）。注意 0.36 的 API：`App::ui(&mut self, ui, frame)`；面板用 `egui::Panel::left/top(..).show(ui, ..)`、`CentralPanel::default().show(ui, ..)`（`show_inside` 已弃用）。
+- 中文字体打包进程序（约 2.4 MB），Web 版 gzip 后总传输约 3.5 MB。字体子集只含 GB2312 + 常用符号；界面里用到的特殊符号要在子集范围内（如 ▶◀■→ 可用；✔⏸ 不在子集里，别用）。
+- `ui.set_max_width(x)` 会把区域**撑大**，要写成 `ui.set_max_width(ui.available_width().min(x))`。
+- Rust edition 2024，MSRV 1.95；`rustfmt.toml` 行宽 120。
 
 ## 常用命令
+```sh
+cargo test --workspace
+cargo clippy --workspace --all-targets -- -D warnings
+cargo clippy -p bsc-app --target wasm32-unknown-unknown -- -D warnings
+cargo fmt --all
+cargo run -p bsc-app                                  # 原生桌面版
+cd crates/bsc-app && trunk serve                      # Web 版本地预览（http://127.0.0.1:8080）
+cd crates/bsc-app && trunk build --release --public-url ./   # Web 发布构建 → dist/
 ```
-cargo build
-cargo test
-cargo run -p bsc-cli -- --help
-```
+CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查；`pages.yml` 在 main 分支上构建并发布到 GitHub Pages；`release.yml` 在打 `v*` 标签时构建 Linux/Windows/macOS 原生程序。
+
+## 黑话编译器设计要点（大白话方向为主）
+黑话高度公式化（词汇有限、句式固定、修饰语堆叠但不携带信息），所以把它当成一门有文法的"源语言"：
+- 词法：黑话词典 + 分类（空洞动词、虚指名词、膨胀修饰语）；分词用 Aho-Corasick + 词图最大概率切分。
+- 语法：句式文法（"以 X 为抓手""围绕 X 做好 Y""形成 X 闭环"……），用 Earley 分析器（容忍歧义）。
+- 语义 / IR：事件 + 语义角色（谁、做什么、对象、目的、手段），与措辞无关。
+- 优化 Pass：死代码消除（删无信息修饰语）、常量折叠（固定搭配 → 简单说法）、公共子表达式消除（排比合并）、降级 lowering（沿上位词图把抽象概念降到具体说法）。每个 Pass 前后可对比。
+- 后端：朴素中文生成 + 每处改动的解释 + "水分"统计。
+- 输入限定为受控范围（常见讲话句式），超出范围时像编译器一样给出诊断，而不是硬凑输出。
+- 反向（大白话 → 黑话）是次要的娱乐功能，复用同一 IR、换后端。
+- 它用到的每项技术都应先在课程里讲过。
+
+## 里程碑
+- [x] M0 骨架：workspace、eframe 应用（原生 + Web）、中文字体、CI/Pages/Release 工作流、计算器编译器 + 第 0 课 + 实验台 + 黑话编译器设计页
+- [ ] M1 第 1 章词法：`bsc-automata`（Thompson 构造、子集构造、Hopcroft 最小化，全部带步骤记录）+ 状态图可视化
+- [ ] M2 第 2 章语法：文法工具（FIRST/FOLLOW、LL(1) 表、LR 自动机）+ Pratt；mini-lang 前端
+- [ ] M3 第 3 章语义：作用域、符号表、类型检查
+- [ ] M4–M5 中间表示与优化：三地址码、CFG、支配树、SSA、数据流框架、各优化 Pass
+- [ ] M6 起：黑话编译器 v1；第 6 章后端（字节码 VM、RISC-V 汇编 + 内置模拟器、寄存器分配）
+
+## 协作约定
+- 用户已授权技术决策由 Claude 决定；大的方向变化仍先和用户沟通。
+- **直接在 `main` 分支上开发和推送**，不要另建分支（用户明确要求）。推送到 main 会自动触发 GitHub Pages 发布。
+- 提交信息用中文或英文均可，说清改了什么和为什么。
