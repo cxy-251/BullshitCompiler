@@ -292,10 +292,10 @@ impl Heap {
     fn sweep(&mut self) {
         let reach = reachable(&self.objs, &self.roots);
         let mut freed = Vec::new();
-        for i in 0..self.objs.len() {
-            if self.objs[i].alive && self.objs[i].color == Color::White {
-                self.objs[i].alive = false;
-                self.objs[i].lost = reach[i];
+        for (i, (o, r)) in self.objs.iter_mut().zip(&reach).enumerate() {
+            if o.alive && o.color == Color::White {
+                o.alive = false;
+                o.lost = *r;
                 freed.push(i);
             }
         }
@@ -510,7 +510,7 @@ mod tests {
                         made += 1;
                     }
                     2 if made > 0 => lines.push(format!("root {} = {}", ["x", "y"][rand(2)], pick(rand(made + 1)))),
-                    3 | 4 | 5 if made > 0 => {
+                    3..=5 if made > 0 => {
                         lines.push(format!("{}.{} = {}", names[rand(made)], rand(2), pick(rand(made + 1))))
                     }
                     6 if !marking => {
