@@ -5,16 +5,25 @@
 //! （"我们要"）转交给同一句里的下一个分句，免得后面的话丢了主语。
 
 use crate::ir::{ClauseIr, Part, Template};
-use crate::lexicon::{Cat, Func};
+use crate::lexicon::{Cat, Func, Piece};
 
 pub fn part_text(ir: &ClauseIr, p: &Part) -> String {
     let t = |ws: &[usize]| ir.text_of(ws);
-    let mut s = match p.template {
+    let mut s = match &p.template {
         None => t(&p.words),
         Some(Template::StartFrom) => format!("从{}入手", t(&p.obj)),
         Some(Template::DrivenBy) => format!("靠{}推动", t(&p.obj)),
         Some(Template::TreatAs) => format!("把{}当作{}", t(&p.obj), t(&p.obj2)),
+        Some(Template::Pattern(dst)) => dst
+            .iter()
+            .map(|piece| match piece {
+                Piece::Lit(l) => l.clone(),
+                Piece::Slot(0) => t(&p.obj),
+                Piece::Slot(_) => t(&p.obj2),
+            })
+            .collect(),
         Some(Template::Has(split)) => {
+            let split = *split;
             // 话题在前："业务形成闭环" → "业务有完整流程"；在宾语里："形成业务闭环" → "让业务有完整流程"。
             // 情态词保留："要形成业务闭环" → "要让业务有完整流程"
             let modal: Vec<usize> =

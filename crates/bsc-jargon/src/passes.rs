@@ -42,7 +42,9 @@ impl Pass {
 
     pub fn what(self) -> &'static str {
         match self {
-            Pass::Fold => "固定搭配（降本增效、形成合力……）的意思是固定的，像常量表达式一样，整体换成大白话。",
+            Pass::Fold => {
+                "固定搭配（降本增效、形成合力……）和套话模板（坚持 X 不动摇）的意思是固定的，像常量表达式一样，整体换成大白话，模板槽位里的内容原样保留；缩略语（放管服）展开成完整说法。"
+            }
             Pass::Dce => {
                 "膨胀修饰语（全面、深入、高质量……）不携带信息，删掉；\"形成闭环\"\"开创新局面\"这种动词和宾语都是虚的块，整块删掉；删完后悬空的\"的\"\"和\"一并删掉。"
             }
@@ -114,12 +116,25 @@ fn live_parts(irs: &[ClauseIr]) -> Vec<(usize, usize)> {
 
 fn fold(irs: &mut [ClauseIr], lex: &Lexicon, out: &mut Vec<Change>) {
     for (c, p) in live_parts(irs) {
+        // 套话模板：整块按模板的映射生成（字面部分换掉，槽位照搬）
+        edit_part(irs, c, p, out, |ir, p| {
+            let i = ir.parts[p].pattern?;
+            let pat = &lex.patterns[i];
+            let e = &lex.entries[pat.entry];
+            let why = format!(
+                "套话模板「{}」→「{}」：整体换成大白话，槽位里的内容保留",
+                e.word,
+                e.target.as_deref().unwrap_or_default()
+            );
+            ir.parts[p].template = Some(Template::Pattern(pat.dst.clone()));
+            Some((ir.parts[p].markers.clone(), why))
+        });
         edit_part(irs, c, p, out, |ir, p| {
             let ws: Vec<usize> = ir.parts[p]
                 .words
                 .iter()
                 .copied()
-                .filter(|&w| ir.alive(w) && matches!(ir.words[w].cat, Cat::Fixed | Cat::FixedVerb))
+                .filter(|&w| ir.alive(w) && matches!(ir.words[w].cat, Cat::Fixed | Cat::FixedVerb | Cat::Abbrev))
                 .filter(|&w| ir.words[w].entry.and_then(|e| lex.entries[e].target.as_ref()).is_some())
                 .collect();
             if ws.is_empty() {
@@ -129,10 +144,11 @@ fn fold(irs: &mut [ClauseIr], lex: &Lexicon, out: &mut Vec<Change>) {
             for &w in &ws {
                 let e = &lex.entries[ir.words[w].entry.unwrap()];
                 let t = e.target.clone().unwrap();
-                why.push(format!("「{}」→「{t}」", e.word));
+                let what = if e.cat == Cat::Abbrev { "缩略语展开" } else { "固定搭配整体替换" };
+                why.push(format!("{what}「{}」→「{t}」", e.word));
                 ir.words[w].now = Some(t);
             }
-            Some((ws, format!("固定搭配整体替换：{}", why.join("，"))))
+            Some((ws, why.join("；")))
         });
     }
 }

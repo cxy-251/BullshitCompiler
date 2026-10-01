@@ -593,11 +593,12 @@ impl JargonPage {
             }
         }
         egui::CollapsingHeader::new("句式文法").id_salt("jargon_grammar").show(ui, |ui| {
-            ui.label(RichText::new(grammar::CLAUSE_GRAMMAR).font(mono(14.0)));
+            ui.label(RichText::new(grammar::clause_grammar(&self.comp.lex)).font(mono(14.0)));
             prose_colored(
                 ui,
                 "代价：每个`块`10（尽量少切块）；没有动词的块 +8、话题在前的块 +3（优先把名词当宾语）；\
-                 修饰语当名词用、情态词放进谓词 +1（优先让修饰语修饰后面的动词）。",
+                 修饰语当名词用、情态词放进谓词 +1（优先让修饰语修饰后面的动词）。\
+                 最后几行是词典里的套话模板生成的规则，`套话`块只算 4，认得出就优先用模板。",
                 14.0,
                 p.muted,
             );
@@ -635,7 +636,7 @@ impl JargonPage {
                 }
                 for part in &ir.parts {
                     let slots = slots(part);
-                    ir_row(ui, ir, part.role.name(), &slots, part.template, part.dead, hover);
+                    ir_row(ui, ir, part.role.name(), &slots, part.template.as_ref(), part.dead, hover);
                     if !part.appended.is_empty() {
                         ui.label(
                             RichText::new(format!("    并进来的宾语：{}", part.appended.join("、")))
@@ -693,6 +694,8 @@ impl JargonPage {
                     Cat::FixedVerb,
                     Cat::Verb,
                     Cat::Content,
+                    Cat::Abbrev,
+                    Cat::Pattern,
                 ] {
                     let n = lex.entries.iter().filter(|e| e.cat == cat).count();
                     chip(
@@ -1102,6 +1105,11 @@ const RISKS: &[(&str, &str)] = &[
     ("切分有歧义", "候选词画成词图，用动态规划选代价最小的切分，而不是\"先到先得\"。"),
     ("加了新词，旧句子悄悄变了", "每加一批，自动重新编译示例讲话，列出译文的变化（回归对比）。"),
     ("文法跟着词典改", "不用改：句式文法的终结符是词的类别，新词只要分对类，就自动适用所有句式和优化。"),
+    (
+        "套话模板写坏了",
+        "模板（坚持{X}不动摇）加载时变成句式文法的规则。槽位写错报 E3014；映射丢了或重复了槽位报 E3015（槽位里是实际内容，不能丢）；\
+         字面部分有没收录的单字报 E3016（为它收单字会把普通词切碎）。",
+    ),
 ];
 
 fn why(ui: &mut Ui) {
@@ -1173,7 +1181,7 @@ fn cat_color(p: &Palette, cat: Cat) -> Color32 {
         Cat::Modifier => p.muted,
         Cat::Hollow | Cat::Filler => p.keyword,
         Cat::Vague => p.operator,
-        Cat::Fixed | Cat::FixedVerb => p.number,
+        Cat::Fixed | Cat::FixedVerb | Cat::Abbrev | Cat::Pattern => p.number,
         Cat::Func(_) => p.paren,
         Cat::Verb | Cat::Content => p.text,
     }
@@ -1351,7 +1359,7 @@ fn ir_row(
     ir: &ClauseIr,
     role: &str,
     slots: &[(&str, &Vec<usize>)],
-    template: Option<Template>,
+    template: Option<&Template>,
     dead: bool,
     hover: &mut Vec<Span>,
 ) {
@@ -1387,6 +1395,7 @@ fn ir_row(
                 Template::DrivenBy => "句式改写：靠 X 推动",
                 Template::TreatAs => "句式改写：把 X 当作 Y",
                 Template::Has(_) => "句式改写：让 X 有 Y",
+                Template::Pattern(_) => "套话模板：整体换成大白话，槽位照搬",
             };
             ui.label(RichText::new(name).size(13.0).color(p.ok));
         }

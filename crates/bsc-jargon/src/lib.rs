@@ -26,6 +26,8 @@ pub mod lexicon;
 pub mod passes;
 pub mod segment;
 
+use std::collections::HashMap;
+
 use bsc_core::{Diagnostic, Span};
 use bsc_grammar::Sym;
 use bsc_grammar::grammar::Grammar;
@@ -40,6 +42,10 @@ pub struct Compiler {
     pub grammar: Grammar,
     /// 每个词类别对应的终结符。
     term_of: Vec<(&'static str, Sym)>,
+    /// 套话模板字面部分的终结符：(字面文字 → 终结符)。
+    lit_term: HashMap<String, Sym>,
+    /// 每条套话模板（`lex.patterns` 的下标）对应的产生式。
+    pattern_prods: Vec<usize>,
 }
 
 #[derive(Clone, Debug)]
@@ -96,13 +102,26 @@ pub struct Compilation {
 impl Compiler {
     pub fn new(layers: Vec<Layer>) -> Compiler {
         let lex = Lexicon::build(layers);
-        let grammar = Grammar::parse(grammar::CLAUSE_GRAMMAR).expect("句式文法写错了");
+        let grammar = Grammar::parse(&grammar::clause_grammar(&lex)).expect("句式文法写错了");
         let term_of = ["修饰", "动", "名"]
             .into_iter()
             .chain(lexicon::Func::ALL.iter().map(|f| f.name()))
             .map(|name| (name, grammar.symbol(name).filter(|&s| grammar.is_terminal(s)).expect(name)))
             .collect();
-        Compiler { lex, grammar, term_of }
+        let mut lit_term = HashMap::new();
+        for pat in &lex.patterns {
+            for piece in &pat.src {
+                if let lexicon::Piece::Lit(l) = piece
+                    && let Some(sym) = grammar.symbol(&grammar::lit_terminal(l))
+                {
+                    lit_term.insert(l.clone(), sym);
+                }
+            }
+        }
+        // 套话的产生式按模板的顺序排在一起
+        let pattern_prods =
+            (0..grammar.productions.len()).filter(|&p| grammar.name(grammar.productions[p].lhs) == "套话").collect();
+        Compiler { lex, grammar, term_of, lit_term, pattern_prods }
     }
 
     /// 内置词典。
@@ -139,7 +158,14 @@ impl Compiler {
         let mut stats = Stats::default();
         for seg in segment::split(input, lex) {
             let syms: Vec<Sym> = seg.tokens.iter().map(|t| self.sym(t.cat(lex).terminal())).collect();
-            let parse = earley::parse(g, &syms, &|p| grammar::cost(g, p));
+            // 每个词的候选终结符：类别，以及（如果它是某个套话模板的字面部分）模板的终结符
+            let opts: Vec<Vec<Sym>> = seg
+                .tokens
+                .iter()
+                .zip(&syms)
+                .map(|(t, &s)| std::iter::once(s).chain(self.lit_term.get(&t.text).copied()).collect())
+                .collect();
+            let parse = earley::parse(g, &opts, &|p| grammar::cost(g, p));
             let words = ir::words_of(&seg.tokens, lex);
             for w in &words {
                 stats.words += 1;
@@ -149,7 +175,7 @@ impl Compiler {
             }
             let mut ir = match &parse.tree {
                 _ if words.is_empty() => ir::fallback(words, seg.punct.clone(), seg.ends_sentence),
-                Some(tree) => ir::lower_tree(g, tree, words, seg.punct.clone(), seg.ends_sentence),
+                Some(tree) => ir::lower_tree(g, tree, words, seg.punct.clone(), seg.ends_sentence, &self.pattern_prods),
                 None => {
                     stats.fallback += 1;
                     diags.push(self.parse_error(&seg, &syms, parse.fail_at.unwrap_or(0)));
@@ -229,6 +255,9 @@ pub fn ai_prompt(words: &[(String, String)]) -> String {
          - 固定 / 固定动：名词性 / 动词性的固定搭配，映射写整个搭配的大白话（降本增效 | 固定 | 省钱又提效）\n\
          - 实动：本来就朴素的动词\n\
          - 内容：普通词，不是黑话\n\
+         - 缩略：压缩过的说法，背后有具体内容，映射写展开后的完整说法（放管服 | 缩略 | 简化审批、加强监管、改进服务）\n\
+         - 模板：带槽位的套话句式，{X}、{Y} 是槽位（坚持{X}不动摇 | 模板 | 一直坚持{X}）。映射里每个槽位正好用一次；\
+           字面部分写两个字以上的词，不要用单个字\n\
          要求：\n\
          - 先看例句判断这个词在这里是不是空话；例句里它表达实在意思的（具体的事、具体的对象），写成\"内容\"类。\n\
          - 有歧义、拿不准的词写成\"内容\"，不要猜。\n\
@@ -279,6 +308,7 @@ pub const PRESETS: &[(&str, &str)] = &[
     ),
     ("句式之外", "和兄弟单位一起，共建共享。在新的历史起点上，我们要守正创新，勇毅前行。"),
     ("大白话", "昨天下雨了，我没带伞。"),
+    ("套话与缩略", "我们要坚持改革开放不动摇，把各项任务落到实处，在质量上下功夫。要守住安全底线，抓好三农工作。"),
 ];
 
 /// 界面上"扩充词典"的示例：一批 AI 生成的词条，故意混进了词典膨胀时常见的各种问题。
@@ -314,6 +344,15 @@ pub const EXAMPLE_BATCH: &str = "\
 # 链太长
 超级抓手 | 虚名 | 核心抓手
 核心抓手 | 虚名 | 关键抓手
+# 缩略语和套话模板
+一网通办 | 缩略 | 在一个网站上办完各种手续
+推动{X}落地生根 | 模板 | 让{X}扎下根来
+# 模板的映射把槽位丢了（槽位里是实际内容）
+坚持{X}不放松 | 模板 | 一直坚持
+# 槽位只能写 {X}、{Y}
+以{内容}为纲 | 模板 | 抓住{内容}
+# 模板的字面部分有没收录的单字
+向{X}要效益 | 模板 | 从{X}里找效益
 关键抓手 | 虚名 | 抓手
 # 映射比原词长太多，应该放进备注
 内卷 | 虚名 | 大家都在拼命但是谁也没有占到便宜
@@ -376,11 +415,33 @@ mod tests {
         let ext = Compiler::with_extra("示例", EXAMPLE_BATCH);
         let codes: Vec<&str> = ext.lex.diags.iter().filter(|d| d.layer == 2).filter_map(|d| d.diag.code).collect();
         for code in
-            ["E3001", "E3002", "E3003", "E3010", "E3007", "W3004", "W3005", "W3008", "W3013", "N3004", "N3009", "N3011"]
+            ["E3001", "E3002", "E3003", "E3010", "E3007", "E3014", "E3015", "E3016", "W3004", "W3005", "W3008", "W3013"]
+                .into_iter()
+                .chain(["N3004", "N3009", "N3011"])
         {
             assert!(codes.contains(&code), "{code} 没有报出来：{codes:?}");
         }
         let outside = PRESETS.iter().find(|(n, _)| *n == "句式之外").unwrap().1;
         assert!(ext.compile(outside).output.contains("大胆往前走"));
+        assert!(
+            ext.compile("要推动改革落地生根。").output.contains("让改革扎下根来"),
+            "{}",
+            ext.compile("要推动改革落地生根。").output
+        );
+    }
+
+    /// 套话模板和缩略语：模板整体换掉、槽位里的内容保留；缩略语展开。
+    #[test]
+    fn patterns_and_abbrevs() {
+        let c = Compiler::builtin();
+        let text = PRESETS.iter().find(|(n, _)| *n == "套话与缩略").unwrap().1;
+        let out = c.compile(text).output;
+        for want in ["一直坚持改革开放", "落实", "任务", "花力气抓质量", "不出安全问题", "农业、农村、农民"]
+        {
+            assert!(out.contains(want), "缺「{want}」：{out}");
+        }
+        for gone in ["不动摇", "落到实处", "上下功夫", "底线", "三农"] {
+            assert!(!out.contains(gone), "还有「{gone}」：{out}");
+        }
     }
 }

@@ -8,7 +8,7 @@ use bsc_core::Span;
 use bsc_grammar::Tree;
 use bsc_grammar::grammar::Grammar;
 
-use crate::lexicon::{Cat, Func, Lexicon};
+use crate::lexicon::{Cat, Func, Lexicon, Piece};
 use crate::segment::Token;
 
 #[derive(Clone, Debug)]
@@ -42,6 +42,8 @@ pub enum Role {
     Action,
     /// 进而 / 从而 ……
     Link,
+    /// 词典里的套话模板（坚持 X 不动摇）
+    Pattern,
 }
 
 impl Role {
@@ -53,12 +55,13 @@ impl Role {
             Role::Purpose => "目的",
             Role::Action => "动作",
             Role::Link => "连接",
+            Role::Pattern => "套话",
         }
     }
 }
 
 /// 句式改写：生成时不再按原词序拼接，而是换一个朴素的句式。
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Template {
     /// 以 X 为抓手 → 从 X 入手
     StartFrom,
@@ -68,6 +71,8 @@ pub enum Template {
     TreatAs,
     /// 形成 X 闭环 → X 有完整流程（参数：obj2 从这里起是虚指名词）
     Has(usize),
+    /// 套话模板的映射：坚持{X}不动摇 → 一直坚持{X}（{X} 是 obj，{Y} 是 obj2）
+    Pattern(Vec<Piece>),
 }
 
 #[derive(Clone, Debug)]
@@ -84,6 +89,8 @@ pub struct Part {
     /// 第二个名词组：手段的 Y、动作的宾语（有第一个名词组时）。
     pub obj2: Vec<usize>,
     pub template: Option<Template>,
+    /// 认出来的套话模板（`lex.patterns` 的下标）。
+    pub pattern: Option<usize>,
     /// 排比合并进来的其他分句的宾语。
     pub appended: Vec<String>,
     pub dead: bool,
@@ -128,8 +135,15 @@ pub fn words_of(tokens: &[Token], lex: &Lexicon) -> Vec<Word> {
         .collect()
 }
 
-/// 把语法树翻译成语义块。
-pub fn lower_tree(g: &Grammar, tree: &Tree, words: Vec<Word>, punct: String, ends_sentence: bool) -> ClauseIr {
+/// 把语法树翻译成语义块。`pattern_prods[i]` 是第 i 条套话模板的产生式。
+pub fn lower_tree(
+    g: &Grammar,
+    tree: &Tree,
+    words: Vec<Word>,
+    punct: String,
+    ends_sentence: bool,
+    pattern_prods: &[usize],
+) -> ClauseIr {
     let mut ir = ClauseIr {
         words,
         pre: vec![],
@@ -140,7 +154,7 @@ pub fn lower_tree(g: &Grammar, tree: &Tree, words: Vec<Word>, punct: String, end
         punct,
         ends_sentence,
     };
-    visit(g, tree, &mut ir);
+    visit(g, tree, &mut ir, pattern_prods);
     ir
 }
 
@@ -159,6 +173,7 @@ pub fn fallback(words: Vec<Word>, punct: String, ends_sentence: bool) -> ClauseI
             obj: vec![],
             obj2: vec![],
             template: None,
+            pattern: None,
             appended: vec![],
             dead: false,
         }]
@@ -181,12 +196,12 @@ fn leaves_of(t: &Tree) -> Vec<usize> {
     v
 }
 
-fn visit(g: &Grammar, t: &Tree, ir: &mut ClauseIr) {
+fn visit(g: &Grammar, t: &Tree, ir: &mut ClauseIr, pattern_prods: &[usize]) {
     match g.name(t.sym) {
         "前置" => ir.pre = leaves_of(t),
         "块" if t.children.len() == 2 => {
             // 块 -> 修饰 块：修饰语归到后面那个块里
-            visit(g, &t.children[1], ir);
+            visit(g, &t.children[1], ir, pattern_prods);
             ir.parts.last_mut().unwrap().words.insert(0, t.children[0].start);
         }
         "块" => {
@@ -197,6 +212,7 @@ fn visit(g: &Grammar, t: &Tree, ir: &mut ClauseIr) {
                 "途径" => Role::Via,
                 "目的" => Role::Purpose,
                 "动作" => Role::Action,
+                "套话" => Role::Pattern,
                 _ => Role::Link,
             };
             let mut part = Part {
@@ -207,11 +223,15 @@ fn visit(g: &Grammar, t: &Tree, ir: &mut ClauseIr) {
                 obj: vec![],
                 obj2: vec![],
                 template: None,
+                pattern: pattern_prods.iter().position(|&p| Some(p) == inner.prod),
                 appended: vec![],
                 dead: false,
             };
             for c in &inner.children {
                 match g.name(c.sym) {
+                    // 套话的槽位：第一个是 {X}，第二个是 {Y}
+                    "槽" if part.obj.is_empty() => part.obj = leaves_of(c),
+                    "槽" => part.obj2 = leaves_of(c),
                     "名组" if part.obj.is_empty() && !(role == Role::Action && is_second_np(g, inner, c)) => {
                         part.obj = leaves_of(c)
                     }
@@ -225,7 +245,7 @@ fn visit(g: &Grammar, t: &Tree, ir: &mut ClauseIr) {
         }
         _ => {
             for c in &t.children {
-                visit(g, c, ir);
+                visit(g, c, ir, pattern_prods);
             }
         }
     }

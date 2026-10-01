@@ -9,8 +9,13 @@
 //! - 每多一个"块"代价 10：尽量少切块，一个块就是一个完整的意思；
 //! - 没有动词的块、"话题 + 动词"的块额外加代价：优先把名词当宾语；
 //! - 修饰语当名词用、情态词放进谓词里加 1：优先让修饰语修饰后面的动词、情态词跟着主语。
+//!
+//! 词典里的套话模板（坚持{X}不动摇）在加载时变成额外的规则：`套话 -> 「坚持」 槽 「不动摇」`，
+//! 字面部分是专门的终结符「坚持」，槽位可以是名词组或动宾短语。套话块的代价比普通块低，认得出就优先用模板。
 
 use bsc_grammar::grammar::Grammar;
+
+use crate::lexicon::{Lexicon, Piece};
 
 pub const CLAUSE_GRAMMAR: &str = "\
 分句 -> 前置 主体 | 主体
@@ -31,6 +36,32 @@ pub const CLAUSE_GRAMMAR: &str = "\
 名项 -> 名 | 修饰 | 的 | 主语
 ";
 
+/// 模板字面部分的终结符名。
+pub fn lit_terminal(lit: &str) -> String {
+    format!("「{lit}」")
+}
+
+/// 句式文法：固定部分加上词典里的套话模板。
+pub fn clause_grammar(lex: &Lexicon) -> String {
+    let mut text = CLAUSE_GRAMMAR.to_owned();
+    if lex.patterns.is_empty() {
+        return text;
+    }
+    text.push_str("块 -> 套话\n槽 -> 名组 | 谓词 | 谓词 名组\n");
+    for pat in &lex.patterns {
+        let rhs: Vec<String> = pat
+            .src
+            .iter()
+            .map(|p| match p {
+                Piece::Lit(l) => lit_terminal(l),
+                Piece::Slot(_) => "槽".to_owned(),
+            })
+            .collect();
+        text.push_str(&format!("套话 -> {}\n", rhs.join(" ")));
+    }
+    text
+}
+
 /// 产生式的代价（见模块说明）。
 pub fn cost(g: &Grammar, p: usize) -> u32 {
     let prod = &g.productions[p];
@@ -38,6 +69,7 @@ pub fn cost(g: &Grammar, p: usize) -> u32 {
     let first = prod.rhs.first().map(|&s| g.name(s));
     match (lhs, first, prod.rhs.len()) {
         ("块", Some("修饰"), _) => 0,
+        ("块", Some("套话"), _) => 4,
         ("块", _, _) => 10,
         ("谓词", Some("情态"), _) => 1,
         ("动作", Some("名组"), 1) => 8,
@@ -52,4 +84,4 @@ pub fn cost(g: &Grammar, p: usize) -> u32 {
 }
 
 /// 支持的句式，诊断里列给用户看。
-pub const PATTERNS: &str = "以 X 为 Y、围绕 X、通过 X / 在 X、为了 X、把 X + 动词、让 X + 动词、动词 + 宾语，以及它们的组合（前面可以有\"我们要\"这样的主语和情态词）";
+pub const PATTERNS: &str = "以 X 为 Y、围绕 X、通过 X / 在 X、为了 X、把 X + 动词、让 X + 动词、动词 + 宾语，以及它们的组合（前面可以有\"我们要\"这样的主语和情态词），再加上词典里的套话模板";
