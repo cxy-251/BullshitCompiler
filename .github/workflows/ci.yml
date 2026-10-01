@@ -1,9 +1,8 @@
 name: CI
 
+# 只在 Actions 页面手动运行（用户不想每次推送都跑、失败了发邮件）
 on:
-  push:
-    branches: [main]
-  pull_request:
+  workflow_dispatch:
 
 env:
   CARGO_TERM_COLOR: always

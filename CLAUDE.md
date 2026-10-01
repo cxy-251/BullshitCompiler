@@ -84,8 +84,8 @@ cargo run -p bsc-app                                  # 原生桌面版
 cd crates/bsc-app && trunk serve                      # Web 版本地预览（http://127.0.0.1:8080）
 cd crates/bsc-app && trunk build --release --public-url ./   # Web 发布构建 → dist/
 ```
-CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查；`pages.yml` **只在版本号变化时**构建并发布到 GitHub Pages；`release.yml` 在**次版本号变化**时构建 Linux/Windows/macOS 原生程序并建立 GitHub Release（标签 `v主.次.修订`，自动创建）。
-**不要在本地编译/测试**（用户的 Steam Deck 资源不够）：改完推到 main，由 GitHub Actions 检查，用 `gh run` 看结果；本地最多跑一下 `cargo fmt --all`。
+CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查，**只能手动运行**（用户不想每次推送都跑、失败发邮件）；`pages.yml` **只在版本号变化时**构建并发布到 GitHub Pages；`release.yml` 在**次版本号变化**时构建 Linux/Windows/macOS 原生程序并建立 GitHub Release（标签 `v主.次.修订`，自动创建）。
+**不要在本地编译/测试**（用户的 Steam Deck 资源不够）。平时推送不触发任何构建；想让用户看效果时改修订号，Pages 构建会顺带检查能不能编译，用 `gh run` 看结果。本地最多跑一下 `cargo fmt --all`。不要主动去手动运行 ci.yml。
 
 ## 版本号与发布（用户定的规则）
 版本号只有一处：根目录 `Cargo.toml` 的 `[workspace.package] version`（界面右上角显示 `v0.1.x`）。格式 `主.次.修订`，从 0.1.0 开始。
