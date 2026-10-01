@@ -33,6 +33,8 @@ crates/
                → ac.rs（Aho-Corasick）→ segment.rs（分句、词图最小代价切分）→ grammar.rs + earley.rs（句式文法、加权 Earley）
                → ir.rs（语义角色）→ passes.rs（常量折叠 / 死代码消除 / 降级+句式改写 / 公共子表达式消除，记录每处改动）
                → emit.rs（拼回中文）；lib.rs 的 Compiler 串起全流程，含示例 PRESETS、示例问题批次、AI 提示词
+               corpus.rs：语料 → 待办词表（未收录片段两遍统计 + 四字对齐切分；词典词 + 未知字拼成的四字格），
+               参考译文集 reference/reference.txt（人写的大白话，界面上对照；原文也跑不变式测试）
   bsc-app    eframe/egui 图形界面，原生与 wasm 共用一份代码
     src/app.rs          顶栏 + 三个页面（学习 / 实验台 / 黑话编译器），状态持久化
     src/pages/learn/    课程目录（mod.rs 中的 COURSE）与各课内容（ch0.rs …）
@@ -83,7 +85,7 @@ cd crates/bsc-app && trunk serve                      # Web 版本地预览（ht
 cd crates/bsc-app && trunk build --release --public-url ./   # Web 发布构建 → dist/
 ```
 CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查；`pages.yml` **只在版本号变化时**构建并发布到 GitHub Pages；`release.yml` 在**次版本号变化**时构建 Linux/Windows/macOS 原生程序并建立 GitHub Release（标签 `v主.次.修订`，自动创建）。
-推送前先在本地跑 `cargo fmt --all --check` 和 clippy，别让 CI 因为格式挂掉。
+**不要在本地编译/测试**（用户的 Steam Deck 资源不够）：改完推到 main，由 GitHub Actions 检查，用 `gh run` 看结果；本地最多跑一下 `cargo fmt --all`。
 
 ## 版本号与发布（用户定的规则）
 版本号只有一处：根目录 `Cargo.toml` 的 `[workspace.package] version`（界面右上角显示 `v0.1.x`）。格式 `主.次.修订`，从 0.1.0 开始。

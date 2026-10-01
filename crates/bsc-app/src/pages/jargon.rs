@@ -5,6 +5,7 @@
 //! 粘贴一批 AI 生成的词条，立即看到校验结果和它对已有译文的影响。
 
 use bsc_core::{Diagnostic, Span, line_col};
+use bsc_jargon::corpus::{self, Candidate};
 use bsc_jargon::ir::{ClauseIr, Part, Template};
 use bsc_jargon::lexicon::{Cat, Layer, Lexicon};
 use bsc_jargon::segment::Clause;
@@ -58,6 +59,12 @@ pub struct JargonPage {
     comp: Compiler,
     result: Compilation,
     regress: Regression,
+    /// 语料分析得到的候选词表（只在输入或词典变化时重算）。
+    candidates: Vec<Candidate>,
+    /// 待办词表显示前多少个。
+    candidate_limit: usize,
+    /// 参考译文对照（只在词典变化时重算）。
+    ref_cache: Vec<RefEntry>,
     view: View,
     clause: usize,
     lookup: String,
@@ -74,6 +81,14 @@ pub struct JargonPage {
     pending: Pending,
 }
 
+struct RefEntry {
+    name: String,
+    current: String,
+    reference: String,
+    /// 加批次前的译文（如果和当前不同）。
+    before_batch: Option<String>,
+}
+
 type Pending = std::sync::Arc<std::sync::Mutex<Vec<(String, Option<String>)>>>;
 
 impl Default for JargonPage {
@@ -88,6 +103,7 @@ impl JargonPage {
         let base = Compiler::with_layers(files.clone());
         let comp = Compiler::with_layers(with_batch(&files, &batch));
         let result = comp.compile(&input);
+        let candidates = corpus::analyze(&comp.lex, &input);
         let mut page = Self {
             input,
             batch,
@@ -95,6 +111,9 @@ impl JargonPage {
             comp,
             result,
             regress: vec![],
+            candidates,
+            candidate_limit: 50,
+            ref_cache: vec![],
             view: View::Passes,
             clause: 0,
             lookup: "抓手".to_owned(),
@@ -106,6 +125,7 @@ impl JargonPage {
             pending: Pending::default(),
         };
         page.regress = page.regression();
+        page.ref_cache = page.build_ref_cache();
         page
     }
 
@@ -113,12 +133,31 @@ impl JargonPage {
         self.result = self.comp.compile(&self.input);
         self.clause = self.clause.min(self.result.clauses.len().saturating_sub(1));
         self.hover.clear();
+        self.candidates = corpus::analyze(&self.comp.lex, &self.input);
     }
 
     fn set_batch(&mut self) {
         self.comp = Compiler::with_layers(with_batch(&self.files, &self.batch));
         self.regress = self.regression();
         self.recompile();
+        self.ref_cache = self.build_ref_cache();
+    }
+
+    fn build_ref_cache(&self) -> Vec<RefEntry> {
+        let refs = corpus::parse_references(corpus::BUILTIN_REFERENCES);
+        let has_batch = self.batch_layer().is_some();
+        refs.into_iter()
+            .map(|r| {
+                let current = self.comp.compile(&r.source).output;
+                let before_batch = if has_batch {
+                    let base_out = self.base.compile(&r.source).output;
+                    if base_out != current { Some(base_out) } else { None }
+                } else {
+                    None
+                };
+                RefEntry { name: r.name, current, reference: r.reference, before_batch }
+            })
+            .collect()
     }
 
     /// 本地词典文件夹变了：重新加载。
@@ -331,15 +370,16 @@ impl JargonPage {
         for d in &r.diags {
             diagnostic_view(ui, &self.input, d);
         }
-        if !r.unknown.is_empty() {
+        if !self.candidates.is_empty() {
             ui.add_space(4.0);
             ui.label(
-                RichText::new("没收录的词（原样保留；如果其中有黑话，可以交给 AI 生成词条，见\"扩充词典\"）：")
+                RichText::new("没认出来的词（原样保留；如果其中有黑话，可以交给 AI 生成词条，见\"扩充词典\"）：")
                     .color(p.muted),
             );
             ui.horizontal_wrapped(|ui| {
-                for (w, n) in r.unknown.iter().take(30) {
-                    let text = if *n > 1 { format!("{w} ×{n}") } else { w.clone() };
+                for c in self.candidates.iter().take(30) {
+                    let (w, n) = (&c.text, c.count);
+                    let text = if n > 1 { format!("{w} ×{n}") } else { w.clone() };
                     chip(ui, RichText::new(text).size(14.0), p.card_bg, Stroke::new(1.0, p.card_stroke));
                 }
             });
@@ -361,7 +401,7 @@ impl JargonPage {
             View::Parse => self.parse(ui, hover),
             View::Ir => self.ir(ui, hover),
             View::Lexicon => self.lexicon(ui),
-            View::Extend => self.extend(ui),
+            View::Extend => self.extend(ui, hover),
             View::Why => why(ui),
         }
     }
@@ -710,7 +750,7 @@ impl JargonPage {
         }
     }
 
-    fn extend(&mut self, ui: &mut Ui) {
+    fn extend(&mut self, ui: &mut Ui, hover: &mut Vec<Span>) {
         let p = Palette::of(ui);
         prose(
             ui,
@@ -785,21 +825,84 @@ impl JargonPage {
             }
         }
         ui.add_space(8.0);
-        let words: Vec<String> = self.result.unknown.iter().map(|(w, _)| w.clone()).collect();
-        let prompt = ai_prompt(&words);
-        egui::CollapsingHeader::new(RichText::new("让 AI 生成词条的提示词").size(17.0)).id_salt("jargon_prompt").show(
+        self.todo_list(ui, hover);
+        ui.add_space(8.0);
+        self.references(ui);
+    }
+
+    /// 待办词表：当前输入（整篇真实文章）里没认出来的词，连同例句交给 AI。
+    fn todo_list(&mut self, ui: &mut Ui, hover: &mut Vec<Span>) {
+        let p = Palette::of(ui);
+        ui.label(RichText::new("待办词表：语料里没认出来的词").size(18.0).strong());
+        prose(
             ui,
-            |ui| {
-                ui.label(
-                    RichText::new("已经附上了当前输入里没收录的词。复制给任何一个 AI，把它的回答粘贴到上面的框里。")
-                        .color(p.muted),
-                );
-                if ui.button("复制提示词").clicked() {
-                    ui.ctx().copy_text(prompt.clone());
-                }
-                ui.label(RichText::new(&prompt).font(mono(13.0)));
-            },
+            "把真实的文章（工作报告、年终总结、PPT 文字……）粘贴或拖进左边的输入框，这里列出编译器不认识的词，\
+             按出现次数排序。连同**原文例句**一起交给 AI 填词条，比让 AI 凭空编词可靠：收进来的都是真在用的说法，\
+             AI 也能看例句判断这个词在这里是不是空话。标着\"拼合\"的是一半已收录、一半没收录的四字格（统筹谋划），\
+             最好整体收成一条。",
         );
+        if self.candidates.is_empty() {
+            ui.label(RichText::new("当前输入里的词都认识。").color(p.muted));
+            return;
+        }
+        ui.horizontal_wrapped(|ui| {
+            ui.label(format!("共 {} 个，取前", self.candidates.len()));
+            for n in [30, 50, 100] {
+                ui.selectable_value(&mut self.candidate_limit, n, n.to_string());
+            }
+            ui.label("个。");
+        });
+        let shown = &self.candidates[..self.candidates.len().min(self.candidate_limit)];
+        let words: Vec<(String, String)> = shown.iter().map(|c| (c.text.clone(), c.example.clone())).collect();
+        let prompt = ai_prompt(&words);
+        if ui.button(format!("复制给 AI 的提示词（含这 {} 个词和例句）", shown.len())).clicked() {
+            ui.ctx().copy_text(prompt.clone());
+        }
+        egui::Grid::new("jargon_todo").striped(true).num_columns(3).show(ui, |ui| {
+            for c in shown {
+                let mut word = RichText::new(&c.text).strong();
+                if c.kind == corpus::Kind::Phrase {
+                    word = word.color(p.accent);
+                }
+                let mut hovered = ui.label(word).hovered();
+                let tag = if c.kind == corpus::Kind::Phrase { "拼合 ×" } else { "×" };
+                hovered |= ui.label(RichText::new(format!("{tag}{}", c.count)).color(p.muted)).hovered();
+                hovered |= ui.label(RichText::new(&c.example).size(14.0).color(p.muted)).hovered();
+                if hovered {
+                    *hover = vec![c.span];
+                }
+                ui.end_row();
+            }
+        });
+        egui::CollapsingHeader::new(RichText::new("提示词全文").size(17.0)).id_salt("jargon_prompt").show(ui, |ui| {
+            ui.label(RichText::new(&prompt).font(mono(13.0)));
+        });
+    }
+
+    /// 参考译文对照：人写的大白话 vs 编译器的译文；加了批次以后变了的标出来。
+    fn references(&self, ui: &mut Ui) {
+        let p = Palette::of(ui);
+        ui.label(RichText::new("参考译文对照").size(18.0).strong());
+        prose(
+            ui,
+            "几段真实原文和**人写的参考译文**（`crates/bsc-jargon/reference/reference.txt`）。编译器不追求和参考译文逐字相同；\
+             加一批词以后，看译文是离参考更近还是更远——比只看\"有没有残留黑话\"更能发现删过头、把实词当空话这类问题。",
+        );
+        for r in &self.ref_cache {
+            card(ui, |ui| {
+                ui.horizontal_wrapped(|ui| {
+                    ui.label(RichText::new(&r.name).strong());
+                    if r.before_batch.is_some() {
+                        ui.label(RichText::new("加这一批以后变了").color(p.accent));
+                    }
+                });
+                if let Some(before) = &r.before_batch {
+                    ui.label(RichText::new(before).strikethrough().color(p.muted));
+                }
+                ui.label(RichText::new(format!("编译器：{}", r.current)).color(p.ok));
+                ui.label(format!("参考：{}", r.reference));
+            });
+        }
     }
 }
 

@@ -17,6 +17,7 @@
 //! 以及每一处改动都能说出理由、同一个词在全文里的译法始终一致。
 
 pub mod ac;
+pub mod corpus;
 pub mod earley;
 pub mod emit;
 pub mod grammar;
@@ -88,8 +89,6 @@ pub struct Compilation {
     pub output: String,
     pub diags: Vec<Diagnostic>,
     pub stats: Stats,
-    /// 没收录的词（连续的未知字），可以交给 AI 判断是不是黑话：(词, 出现次数)。
-    pub unknown: Vec<(String, usize)>,
     /// 输出里残留的黑话。
     pub residual: Vec<String>,
 }
@@ -138,7 +137,6 @@ impl Compiler {
         let mut ir0 = Vec::new();
         let mut diags = Vec::new();
         let mut stats = Stats::default();
-        let mut unknown: Vec<(String, usize)> = Vec::new();
         for seg in segment::split(input, lex) {
             let syms: Vec<Sym> = seg.tokens.iter().map(|t| self.sym(t.cat(lex).terminal())).collect();
             let parse = earley::parse(g, &syms, &|p| grammar::cost(g, p));
@@ -147,12 +145,6 @@ impl Compiler {
                 stats.words += 1;
                 if w.cat.is_jargon() {
                     stats.jargon_words += 1;
-                }
-                if w.entry.is_none() && w.text.chars().count() >= 2 {
-                    match unknown.iter_mut().find(|(s, _)| *s == w.text) {
-                        Some((_, n)) => *n += 1,
-                        None => unknown.push((w.text.clone(), 1)),
-                    }
                 }
             }
             let mut ir = match &parse.tree {
@@ -197,8 +189,7 @@ impl Compiler {
                     .with_help("看看词典校验里的 W3005 / W3008 / E3007，把相应词条的映射改成朴素说法"),
             );
         }
-        unknown.sort_by(|a, b| b.1.cmp(&a.1).then(b.0.chars().count().cmp(&a.0.chars().count())));
-        Compilation { clauses, ir0, irs, unoptimized, passes, output, diags, stats, unknown, residual }
+        Compilation { clauses, ir0, irs, unoptimized, passes, output, diags, stats, residual }
     }
 
     fn parse_error(&self, seg: &Clause, syms: &[Sym], at: usize) -> Diagnostic {
@@ -224,8 +215,8 @@ fn count_chars(s: &str) -> usize {
     s.chars().filter(|c| c.is_alphanumeric()).count()
 }
 
-/// 让 AI 批量生成词条时用的提示词。`words` 是编译时发现的未收录词语。
-pub fn ai_prompt(words: &[String]) -> String {
+/// 让 AI 批量生成词条时用的提示词。`words` 是（词, 例句）。
+pub fn ai_prompt(words: &[(String, String)]) -> String {
     let mut s = String::from(
         "你是中文\"官话、套话、互联网黑话\"的词典编纂者。请为下面的词语各写一行词条，只输出词条，不要解释。\n\
          \n\
@@ -238,12 +229,22 @@ pub fn ai_prompt(words: &[String]) -> String {
          - 固定 / 固定动：名词性 / 动词性的固定搭配，映射写整个搭配的大白话（降本增效 | 固定 | 省钱又提效）\n\
          - 实动：本来就朴素的动词\n\
          - 内容：普通词，不是黑话\n\
-         要求：映射必须是完全朴素的说法，不能再含有黑话；不要写单个字的词条；不确定的词写成\"内容\"。\n",
+         要求：\n\
+         - 先看例句判断这个词在这里是不是空话；例句里它表达实在意思的（具体的事、具体的对象），写成\"内容\"类。\n\
+         - 有歧义、拿不准的词写成\"内容\"，不要猜。\n\
+         - 映射优先写上位词（更朴素的近义说法），不要写整句解释；映射里不能再含黑话。\n\
+         - 映射必须是完全朴素的说法；不要写单个字的词条。\n\
+         - 只输出词条行，不要把例句抄进输出。\n",
     );
     if !words.is_empty() {
         s.push_str("\n词语：\n");
-        for w in words {
+        for (w, ex) in words {
             s.push_str(w);
+            if !ex.is_empty() {
+                s.push_str("\t〔例句：");
+                s.push_str(ex);
+                s.push('〕');
+            }
             s.push('\n');
         }
     }
@@ -350,7 +351,7 @@ mod tests {
     #[test]
     fn invariants() {
         let c = Compiler::builtin();
-        for (name, text) in PRESETS {
+        let check = |c: &Compiler, name: &str, text: &str| {
             let r = c.compile(text);
             let plain: String = text.chars().filter(|c| !c.is_whitespace()).collect();
             let unopt: String = r.unoptimized.chars().filter(|c| !c.is_whitespace()).collect();
@@ -363,6 +364,13 @@ mod tests {
             }
             let again = c.compile(&r.output);
             assert_eq!(again.output, r.output, "{name}");
+        };
+        for (name, text) in PRESETS {
+            check(&c, name, text);
+        }
+        // 参考译文集的每条原文也跑一遍同样的不变式
+        for r in corpus::parse_references(corpus::BUILTIN_REFERENCES) {
+            check(&c, &format!("参考:{}", r.name), &r.source);
         }
         // 示例批次：错误都被拦下，词典仍然可用
         let ext = Compiler::with_extra("示例", EXAMPLE_BATCH);
