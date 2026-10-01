@@ -85,7 +85,7 @@ cd crates/bsc-app && trunk serve                      # Web 版本地预览（ht
 cd crates/bsc-app && trunk build --release --public-url ./   # Web 发布构建 → dist/
 ```
 CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查，**只能手动运行**（用户不想每次推送都跑、失败发邮件）；`pages.yml` **只在版本号变化时**构建并发布到 GitHub Pages；`release.yml` 在**次版本号变化**时构建 Linux/Windows/macOS 原生程序并建立 GitHub Release（标签 `v主.次.修订`，自动创建）。
-**不要在本地编译/测试**（用户的 Steam Deck 资源不够）。平时推送不触发任何构建；想让用户看效果时改修订号，Pages 构建会顺带检查能不能编译，用 `gh run` 看结果。本地最多跑一下 `cargo fmt --all`。不要主动去手动运行 ci.yml。
+**在 Steam Deck 上不要本地编译/测试**（资源不够；在 Mac 上能不能编译先问用户）。平时推送不触发任何构建；想让用户看效果时改修订号，Pages 构建会顺带检查能不能编译，用 `gh run` 看结果。本地最多跑一下 `cargo fmt --all`。不要主动去手动运行 ci.yml。
 
 ## 版本号与发布（用户定的规则）
 版本号只有一处：根目录 `Cargo.toml` 的 `[workspace.package] version`（界面右上角显示 `v0.1.x`）。格式 `主.次.修订`，从 0.1.0 开始。
@@ -136,7 +136,8 @@ CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查，**
 - [x] M6 第 6 章后端：6.1 栈式虚拟机、6.2 指令选择、6.3 寄存器分配、6.4 调用约定；第 7 章运行时：7.1 引用计数、7.2 标记-清除、7.3 三色标记与写屏障（课程第 0–7 章全部完成）
 - [x] M7 黑话编译器 v1：分层可扩充词典（带校验）、AC 分词 + 词图、加权 Earley 句式分析、语义角色 IR、四个优化 Pass、生成与自检、黑话编译器页
 - [x] 0.2.0 阶段收尾：逐词处理兜底、真实文档格式（分段/编号/标题）、拖入 txt、复制/保存译文、本地词典文件夹
-- [ ] 之后：扩充词典与句式覆盖面、反向编译（大白话 → 黑话）
+- [x] 0.2.1–0.2.2 词典扩充框架：语料 → 待办词表、参考译文集、缩略语、套话模板
+- [ ] 之后：见 `docs/黑话词典计划.md`（下一步是命令行工具 `bsc-jargon todo/check/run`，让 agy 全程自己扩词典）；反向编译（大白话 → 黑话）
 
 ## 协作约定
 - 用户已授权技术决策由 Claude 决定；大的方向变化仍先和用户沟通。
