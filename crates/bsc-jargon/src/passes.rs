@@ -341,10 +341,18 @@ fn rewrite_pattern(ir: &mut ClauseIr, p: usize, lex: &Lexicon) -> Option<(Vec<us
             if !y.iter().any(|&w| ir.words[w].cat == Cat::Vague) {
                 return None; // "以客户为中心"：没有黑话，不动
             }
-            let (t, why) = if y.iter().any(|&w| chain_has(w, START_WORDS)) {
-                (Template::StartFrom, format!("「以 X 为{}」是说从哪里入手，改写成「从 X 入手」", ir.text_of(&y)))
-            } else if y.iter().any(|&w| chain_has(w, DRIVE_WORDS)) {
-                (Template::DrivenBy, format!("「以 X 为{}」是说靠什么推动，改写成「靠 X 推动」", ir.text_of(&y)))
+            // Y 里的触发词（抓手、引擎……）：它前面只能是虚指名词；后面的内容（分析时并进了 Y 的名词组，
+            // 比如"以 X 为抓手进行全网营销"）原样接在改写后的句式后面，不能丢
+            let trigger = |set: &[&str]| {
+                let i = part.obj2.iter().position(|&w| ir.alive(w) && chain_has(w, set))?;
+                alive(&part.obj2[..i]).iter().all(|&w| ir.words[w].cat == Cat::Vague).then_some(i + 1)
+            };
+            let (t, why) = if let Some(rest) = trigger(START_WORDS) {
+                let y = ir.text_of(&part.obj2[..rest]);
+                (Template::StartFrom(rest), format!("「以 X 为{y}」是说从哪里入手，改写成「从 X 入手」"))
+            } else if let Some(rest) = trigger(DRIVE_WORDS) {
+                let y = ir.text_of(&part.obj2[..rest]);
+                (Template::DrivenBy(rest), format!("「以 X 为{y}」是说靠什么推动，改写成「靠 X 推动」"))
             } else {
                 (Template::TreatAs, "「以 X 为 Y」改写成更口语的「把 X 当作 Y」".to_owned())
             };

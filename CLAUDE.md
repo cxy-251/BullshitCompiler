@@ -35,6 +35,8 @@ crates/
                → emit.rs（拼回中文）；lib.rs 的 Compiler 串起全流程，含示例 PRESETS、示例问题批次、AI 提示词
                corpus.rs：语料 → 待办词表（未收录片段两遍统计 + 四字对齐切分；词典词 + 未知字拼成的四字格），
                参考译文集 reference/reference.txt（人写的大白话，界面上对照；原文也跑不变式测试）
+               src/bin/bsc-jargon.rs：命令行工具（todo 待办词表 + 提示词 / check 批次校验 + 回归对比 + 参考译文 + 不变式 / run 译文 + 改动理由），
+               给 agy 这类不能操作 egui 画布的 AI 助手用；和网页共用 lib.rs 里的 report / regression / invariant_violations
   bsc-app    eframe/egui 图形界面，原生与 wasm 共用一份代码
     src/app.rs          顶栏 + 三个页面（学习 / 实验台 / 黑话编译器），状态持久化
     src/pages/learn/    课程目录（mod.rs 中的 COURSE）与各课内容（ch0.rs …）
@@ -83,9 +85,12 @@ cargo fmt --all
 cargo run -p bsc-app                                  # 原生桌面版
 cd crates/bsc-app && trunk serve                      # Web 版本地预览（http://127.0.0.1:8080）
 cd crates/bsc-app && trunk build --release --public-url ./   # Web 发布构建 → dist/
+cargo run -q --release -p bsc-jargon -- todo 文章.txt         # 黑话命令行：待办词表 + 给 AI 的提示词
+cargo run -q --release -p bsc-jargon -- check 批次.txt 文章.txt  # 校验一批词条（有错误时退出码 1）
+cargo run -q --release -p bsc-jargon -- run 文章.txt [-l 批次.txt]  # 译文 + 每处改动的理由
 ```
 CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查，**只能手动运行**（用户不想每次推送都跑、失败发邮件）；`pages.yml` **只在版本号变化时**构建并发布到 GitHub Pages；`release.yml` 在**次版本号变化**时构建 Linux/Windows/macOS 原生程序并建立 GitHub Release（标签 `v主.次.修订`，自动创建）。
-**在 Steam Deck 上不要本地编译/测试**（资源不够；在 Mac 上能不能编译先问用户）。平时推送不触发任何构建；想让用户看效果时改修订号，Pages 构建会顺带检查能不能编译，用 `gh run` 看结果。本地最多跑一下 `cargo fmt --all`。不要主动去手动运行 ci.yml。
+**在 Steam Deck 上不要本地编译/测试**（资源不够）。**Mac 上可以本地编译和测试**（2026-10 起项目转到 Mac 继续，Rust 1.98、wasm32 target 已装；没装 trunk）。平时推送不触发任何构建；想让用户看效果时改修订号，Pages 构建会顺带检查能不能编译，用 `gh run` 看结果。在 Steam Deck 上最多跑一下 `cargo fmt --all`；在 Mac 上提交前跑齐上面的 test / clippy（含 wasm）。不要主动去手动运行 ci.yml。
 
 ## 版本号与发布（用户定的规则）
 版本号只有一处：根目录 `Cargo.toml` 的 `[workspace.package] version`（界面右上角显示 `v0.1.x`）。格式 `主.次.修订`，从 0.1.0 开始。
@@ -137,7 +142,8 @@ CI（`.github/workflows/`）：`ci.yml` 跑格式/clippy/测试/wasm 检查，**
 - [x] M7 黑话编译器 v1：分层可扩充词典（带校验）、AC 分词 + 词图、加权 Earley 句式分析、语义角色 IR、四个优化 Pass、生成与自检、黑话编译器页
 - [x] 0.2.0 阶段收尾：逐词处理兜底、真实文档格式（分段/编号/标题）、拖入 txt、复制/保存译文、本地词典文件夹
 - [x] 0.2.1–0.2.2 词典扩充框架：语料 → 待办词表、参考译文集、缩略语、套话模板
-- [ ] 之后：见 `docs/黑话词典计划.md`（下一步是命令行工具 `bsc-jargon todo/check/run`，让 agy 全程自己扩词典）；反向编译（大白话 → 黑话）
+- [x] 命令行工具 `bsc-jargon todo/check/run`（让 agy 全程自己扩词典）
+- [ ] 之后：见 `docs/黑话词典计划.md`（agy 按 check 的结果修好词条后分批收进 ai-NNN.txt）；反向编译（大白话 → 黑话）
 
 ## 协作约定
 - 用户已授权技术决策由 Claude 决定；大的方向变化仍先和用户沟通。

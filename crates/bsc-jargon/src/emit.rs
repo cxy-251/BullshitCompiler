@@ -11,8 +11,8 @@ pub fn part_text(ir: &ClauseIr, p: &Part) -> String {
     let t = |ws: &[usize]| ir.text_of(ws);
     let mut s = match &p.template {
         None => t(&p.words),
-        Some(Template::StartFrom) => format!("从{}入手", t(&p.obj)),
-        Some(Template::DrivenBy) => format!("靠{}推动", t(&p.obj)),
+        Some(Template::StartFrom(rest)) => format!("从{}入手{}", t(&p.obj), t(&p.obj2[*rest..])),
+        Some(Template::DrivenBy(rest)) => format!("靠{}推动{}", t(&p.obj), t(&p.obj2[*rest..])),
         Some(Template::TreatAs) => format!("把{}当作{}", t(&p.obj), t(&p.obj2)),
         Some(Template::Pattern(dst)) => dst
             .iter()

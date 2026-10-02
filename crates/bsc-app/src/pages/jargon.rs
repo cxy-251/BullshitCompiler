@@ -192,46 +192,17 @@ impl JargonPage {
         }
     }
 
-    /// 译文 + 每处改动的说明，保存成 txt 时用。
-    fn report(&self) -> String {
-        let r = &self.result;
-        let mut s = r.output.clone();
-        s.push_str(&format!(
-            "\n\n———— 黑话编译器报告 ————\n原文 {} 字 → 译文 {} 字，水分 {:.0}%\n",
-            r.stats.chars_in,
-            r.stats.chars_out,
-            r.stats.water() * 100.0
-        ));
-        for run in &r.passes {
-            for ch in &run.changes {
-                let after = if ch.after.is_empty() { "（删掉）" } else { &ch.after };
-                s.push_str(&format!("[{}] {} → {}：{}\n", run.pass.name(), ch.before, after, ch.why));
-            }
-        }
-        for d in &r.diags {
-            s.push_str(&format!("[提醒] {}\n", d.message));
-        }
-        s
-    }
-
     /// 加上扩充批次以后，哪些示例的译文变了。
     fn regression(&self) -> Regression {
         if self.batch.trim().is_empty() {
             return vec![];
         }
-        let mut out = Vec::new();
-        let mut inputs: Vec<(String, &str)> = PRESETS.iter().map(|(n, t)| ((*n).to_owned(), *t)).collect();
+        let mut inputs: Vec<(String, String)> =
+            PRESETS.iter().map(|(n, t)| ((*n).to_owned(), (*t).to_owned())).collect();
         if !PRESETS.iter().any(|(_, t)| *t == self.input) {
-            inputs.push(("当前输入".to_owned(), &self.input));
+            inputs.push(("当前输入".to_owned(), self.input.clone()));
         }
-        for (name, text) in inputs {
-            let a = self.base.compile(text).output;
-            let b = self.comp.compile(text).output;
-            if a != b {
-                out.push((name, a, b));
-            }
-        }
-        out
+        bsc_jargon::regression(&self.base, &self.comp, &inputs)
     }
 
     pub fn ui(&mut self, ui: &mut Ui) {
@@ -364,7 +335,7 @@ impl JargonPage {
             self.notice = "译文已复制".to_owned();
         }
         if save {
-            self.notice = local::save_output(self.source.as_deref(), &self.report());
+            self.notice = local::save_output(self.source.as_deref(), &self.result.report());
         }
         let r = &self.result;
         for d in &r.diags {
@@ -1391,8 +1362,8 @@ fn ir_row(
         }
         if let Some(t) = template {
             let name = match t {
-                Template::StartFrom => "句式改写：从 X 入手",
-                Template::DrivenBy => "句式改写：靠 X 推动",
+                Template::StartFrom(_) => "句式改写：从 X 入手",
+                Template::DrivenBy(_) => "句式改写：靠 X 推动",
                 Template::TreatAs => "句式改写：把 X 当作 Y",
                 Template::Has(_) => "句式改写：让 X 有 Y",
                 Template::Pattern(_) => "套话模板：整体换成大白话，槽位照搬",

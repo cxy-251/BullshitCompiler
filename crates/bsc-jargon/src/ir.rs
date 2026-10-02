@@ -63,10 +63,10 @@ impl Role {
 /// 句式改写：生成时不再按原词序拼接，而是换一个朴素的句式。
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Template {
-    /// 以 X 为抓手 → 从 X 入手
-    StartFrom,
-    /// 以 X 为引擎 → 靠 X 推动
-    DrivenBy,
+    /// 以 X 为抓手 → 从 X 入手（参数：obj2 从这里起是抓手后面的内容，原样接在后面）
+    StartFrom(usize),
+    /// 以 X 为引擎 → 靠 X 推动（参数同上）
+    DrivenBy(usize),
     /// 以 X 为 Y → 把 X 当作 Y
     TreatAs,
     /// 形成 X 闭环 → X 有完整流程（参数：obj2 从这里起是虚指名词）

@@ -160,21 +160,27 @@ pub fn segment(input: &str, span: Span, punct: String, ends_sentence: bool, lex:
         edges.push(Edge { start: i, end: i + 1, entry: None, cost });
     }
 
-    // 动态规划：best[j] = 切到第 j 个字为止的最小代价
-    let mut best = vec![u32::MAX; n + 1];
+    // 动态规划：best[j] = 切到第 j 个字为止的最小代价。代价相同时选黑话词占的字少的切法：
+    // "提高效益"切成 提高|效益 和 提|高效|益 代价一样，宁可漏认一个黑话词（原样保留），
+    // 也不要把普通词切碎了再删掉（"提益"）
+    let jargon = |e: &Edge| match e.entry {
+        Some(id) if lex.entries[id].cat.is_jargon() => (e.end - e.start) as u32,
+        _ => 0,
+    };
+    let mut best = vec![(u32::MAX, 0u32); n + 1];
     let mut back: Vec<Option<usize>> = vec![None; n + 1];
-    best[0] = 0;
+    best[0] = (0, 0);
     let mut by_start: Vec<Vec<usize>> = vec![Vec::new(); n + 1];
     for (k, e) in edges.iter().enumerate() {
         by_start[e.start].push(k);
     }
     for i in 0..n {
-        if best[i] == u32::MAX {
+        if best[i].0 == u32::MAX {
             continue;
         }
         for &k in &by_start[i] {
             let e = edges[k];
-            let c = best[i] + e.cost;
+            let c = (best[i].0 + e.cost, best[i].1 + jargon(&e));
             if c < best[e.end] {
                 best[e.end] = c;
                 back[e.end] = Some(k);

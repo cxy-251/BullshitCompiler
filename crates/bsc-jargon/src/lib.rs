@@ -237,6 +237,71 @@ impl Compiler {
     }
 }
 
+impl Compilation {
+    /// 译文 + 每处改动的说明（保存成 txt、命令行 `run` 用）。
+    pub fn report(&self) -> String {
+        let mut s = self.output.clone();
+        s.push_str(&format!(
+            "\n\n———— 黑话编译器报告 ————\n原文 {} 字 → 译文 {} 字，水分 {:.0}%\n",
+            self.stats.chars_in,
+            self.stats.chars_out,
+            self.stats.water() * 100.0
+        ));
+        for run in &self.passes {
+            for ch in &run.changes {
+                let after = if ch.after.is_empty() { "（删掉）" } else { &ch.after };
+                s.push_str(&format!("[{}] {} → {}：{}\n", run.pass.name(), ch.before, after, ch.why));
+            }
+        }
+        for d in &self.diags {
+            s.push_str(&format!("[提醒] {}\n", d.message));
+        }
+        s
+    }
+}
+
+impl Compiler {
+    /// 检查一段输入是否满足编译器的不变式，返回违反的条目（空 = 全部满足）：
+    /// - 没优化的 IR 生成回来就是原文（前端没丢东西）；
+    /// - 输出里没有残留黑话；
+    /// - 未收录的普通词（讲话的实际内容）一个不少；
+    /// - 编译是幂等的：把输出再编译一遍，结果不变。
+    pub fn invariant_violations(&self, text: &str) -> Vec<String> {
+        let r = self.compile(text);
+        let mut out = Vec::new();
+        let squeeze = |s: &str| s.chars().filter(|c| !c.is_whitespace()).collect::<String>();
+        if squeeze(&r.unoptimized) != squeeze(text) {
+            out.push(format!("未优化的 IR 没有还原原文：{}", r.unoptimized));
+        }
+        if !r.residual.is_empty() {
+            out.push(format!("译文里还有黑话：「{}」", r.residual.join("」「")));
+        }
+        for cl in &r.clauses {
+            for t in cl.seg.tokens.iter().filter(|t| t.entry.is_none()) {
+                if !r.output.contains(&t.text) {
+                    out.push(format!("丢了未收录的内容词「{}」", t.text));
+                }
+            }
+        }
+        let again = self.compile(&r.output).output;
+        if again != r.output {
+            out.push(format!("不幂等：再编译一遍变成了「{again}」"));
+        }
+        out
+    }
+}
+
+/// 回归对比：同样的输入，在 `base` 和 `comp` 两套词典下译文不同的那些，返回 (名字, 原来的译文, 现在的译文)。
+pub fn regression(base: &Compiler, comp: &Compiler, inputs: &[(String, String)]) -> Vec<(String, String, String)> {
+    inputs
+        .iter()
+        .filter_map(|(name, text)| {
+            let (a, b) = (base.compile(text).output, comp.compile(text).output);
+            (a != b).then(|| (name.clone(), a, b))
+        })
+        .collect()
+}
+
 fn count_chars(s: &str) -> usize {
     s.chars().filter(|c| c.is_alphanumeric()).count()
 }
@@ -380,33 +445,23 @@ mod tests {
             let r = c.compile(PRESETS[i].1);
             assert_eq!(r.output, want);
         }
+        // 分词代价相同时不把普通词切碎（提|高效|益 → "提益"）
+        assert_eq!(c.compile("要提高效益，提高效果。").output, "要提高效益、效果。");
     }
 
-    /// 对所有示例检查几条不变式：
-    /// - 没优化的 IR 生成回来就是原文（前端没丢东西）；
-    /// - 输出里没有残留黑话；
-    /// - 未收录的普通词（讲话的实际内容）一个不少；
-    /// - 编译是幂等的：把输出再编译一遍，结果不变。
+    /// 对所有示例和参考译文集的原文检查不变式（见 `Compiler::invariant_violations`）。
     #[test]
     fn invariants() {
         let c = Compiler::builtin();
         let check = |c: &Compiler, name: &str, text: &str| {
-            let r = c.compile(text);
-            let plain: String = text.chars().filter(|c| !c.is_whitespace()).collect();
-            let unopt: String = r.unoptimized.chars().filter(|c| !c.is_whitespace()).collect();
-            assert_eq!(unopt, plain, "{name}");
-            assert!(r.residual.is_empty(), "{name}: {:?}", r.residual);
-            for cl in &r.clauses {
-                for t in cl.seg.tokens.iter().filter(|t| t.entry.is_none()) {
-                    assert!(r.output.contains(&t.text), "{name}: 丢了「{}」\n{}", t.text, r.output);
-                }
-            }
-            let again = c.compile(&r.output);
-            assert_eq!(again.output, r.output, "{name}");
+            let v = c.invariant_violations(text);
+            assert!(v.is_empty(), "{name}: {v:?}");
         };
         for (name, text) in PRESETS {
             check(&c, name, text);
         }
+        // 句式改写不能吃掉触发词后面的内容
+        check(&c, "抓手之后", "我们要以数字化转型为抓手进行全网营销。");
         // 参考译文集的每条原文也跑一遍同样的不变式
         for r in corpus::parse_references(corpus::BUILTIN_REFERENCES) {
             check(&c, &format!("参考:{}", r.name), &r.source);
